@@ -9,7 +9,7 @@ Young-Jae Cho<sup>1,†</sup>, Do-Yup Kim<sup>2,†</sup>, Dae-Yeol Kim<sup>1,&#
 
 ## What the Code Computes
 
-Breathing moves the chest and shoulders by about a pixel in an ordinary video, and that movement reaches the camera
+Breathing moves the upper torso by about a pixel in an ordinary video, and that movement reaches the camera
 mixed with head and posture motion, changes of illumination, and sensor noise. This code estimates the respiratory
 rate and a respiratory waveform from such video without a contact sensor. It reads the movement through nine
 observations, each a different measurement of the same displacement, and estimates one latent breathing oscillation
