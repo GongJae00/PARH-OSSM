@@ -19,10 +19,10 @@ oscillation it appears to carry.
 <br>
 <p align="center"><img src="figures/F1_architecture.png" width="100%"></p>
 <p align="center"><sub><b>Figure 1.</b> PARH-OSSM. (a) The chest strip, placed from the shoulder landmarks of the
-first frame, and the torso box below the face. (b) The three observations of one trial, each above its share of the
-Kalman update; where a transient breaks the chest observations, the update moves to torso displacement. (c) The
-smoothed state: the breathing oscillation, its second harmonic, a slow baseline, and an aperiodic residual. (d) The
-rate track and the smoothed waveform.</sub></p>
+first frame, and the torso box below the face. (b) The three observations of one trial and, below them, the share of
+each in the Kalman update; where a transient breaks the chest observations (grey line), the update moves to torso
+displacement. (c) The state-space model and its smoothed state: the breathing oscillation, its second harmonic, a
+slow baseline, and an aperiodic residual. (d) The rate track and the smoothed waveform.</sub></p>
 <br>
 
 1. **Observations.** Optical flow (OF) measures the vertical velocity of the texture in a chest strip placed from

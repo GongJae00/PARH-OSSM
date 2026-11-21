@@ -95,7 +95,7 @@ TEXT_LINE = 3.8
 ROW1_Y, ROW1_LANE = 8.0, 7.5
 ROW2_Y, SHARE_H, SHARE_GAP = ROW1_Y + 4 * ROW1_LANE + TEXT_LINE, 3.4, 0.8
 ROW3_Y, ROW3_H = ROW2_Y + 3 * SHARE_H + 2 * SHARE_GAP + TEXT_LINE, 16.0
-ROW4_Y, ROW4_H = ROW3_Y + ROW3_H + TEXT_LINE + 3.2, 26.0
+ROW4_Y, ROW4_H = ROW3_Y + ROW3_H + 6.8 + TEXT_LINE, 26.0  # tick labels and "Time (s)", then one text line
 HEIGHT = ROW4_Y + ROW4_H + 8.5
 LANE_UNITS, GAIN = 1.6, 0.26
 
@@ -234,12 +234,18 @@ for column, case in enumerate(cases):
     waveform.spines["bottom"].set_visible(True)
     waveform.set_xticks(np.arange(np.ceil(span[0] / 10) * 10, span[1] + 1e-6, 10))
     waveform.tick_params(length=1.5, pad=1, labelsize=5)
-    ends = []
-    for label_text, time, z, colour in (("Belt", belt_time[shown], z_belt, INK),
-                                        ("PARH-OSSM", video_time[:z_smoothed.size], z_smoothed, PARH)):
-        k = np.flatnonzero(time <= span[1])[-1]
-        ends.append((waveform, span[1], float(np.clip(3 * np.tanh(z[k] / 3), -3.3, 3.3)), label_text, colour))
-    end_labels(ends, x_mm=x1 + 0.9)
+    waveform.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
+    if column == 0:
+        # a's traces run to the gutter, so its two names sit above the right end of the axis
+        canvas.text(x1, ROW3_Y - 0.5, "PARH-OSSM", fontsize=5, color=PARH, ha="right", va="bottom")
+        canvas.text(x1 - 11.0, ROW3_Y - 0.5, "Belt", fontsize=5, color=INK, ha="right", va="bottom")
+    else:
+        ends = []
+        for label_text, time, z, colour in (("Belt", belt_time[shown], z_belt, INK),
+                                            ("PARH-OSSM", video_time[:z_smoothed.size], z_smoothed, PARH)):
+            k = np.flatnonzero(time <= span[1])[-1]
+            ends.append((waveform, span[1], float(np.clip(3 * np.tanh(z[k] / 3), -3.3, 3.3)), label_text, colour))
+        end_labels(ends, x_mm=x1 + 0.9)
 
     # row 4: the window rates over the whole trial
     rate = axes_mm(x0, ROW4_Y, x1, ROW4_Y + ROW4_H, trial_span)
@@ -248,6 +254,8 @@ for column, case in enumerate(cases):
     centre = case["windows"].window + WIN / 2
     if column == 1:
         rate.axvspan(*span, color="#e9e9e9", lw=0, zorder=0)
+        canvas.text(to_mm(rate, span[0], 0)[0] + 0.3, ROW4_Y - 0.5, "Window shown above", fontsize=4.8,
+                    color="#6f6f6f", va="bottom")
     rate.plot([centre.min(), centre.max()], [case["constant"]] * 2, color=NEUTRAL, lw=0.8, ls=(0, (1, 1.5)), zorder=1)
     for key, colour in (("hilbert_reference_bpm", INK), ("parh_track_bpm", PARH), ("ossm_kf_track_bpm", OSSM)):
         rate.plot(centre, case["windows"][key], color=colour, lw=1.0, zorder=2)

@@ -31,7 +31,7 @@ from scipy.signal import butter, sosfiltfilt
 
 matplotlib.use("pdf")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from figure_style import (CHEST, GUIDE, INK, MM, OBS, PARH, TORSO, draw_share, draw_trace, lighter,  # noqa: E402
+from figure_style import (CHEST, INK, MM, NEUTRAL, OBS, PARH, TORSO, draw_share, draw_trace, lighter,  # noqa: E402
                           median_z)
 
 plt.rcParams.update({"mathtext.fontset": "custom", "mathtext.rm": "Liberation Sans",
@@ -81,9 +81,12 @@ TRANSIENT_S = float(common_time[np.argmax(np.where(in_span, median_abs, -1))])
 # vertical layout of the right column, in mm
 LEFT_X, LABEL_X, PLOT_X0, PLOT_X1 = 60.0, 63.0, 86.0, 174.5
 TEXT_LINE = 3.8
-B_TOP, LANE, TRACE_H, SHARE_H = 8.0, 11.0, 7.0, 2.6
-B_END = B_TOP + len(families) * LANE - (LANE - TRACE_H - 0.4 - SHARE_H)
-C_TOP, C_LANE = B_END + TEXT_LINE, 5.2
+B_TOP, TRACE_LANE, TRACE_H = 8.0, 8.0, 7.0
+SHARE_TITLE_Y = B_TOP + len(families) * TRACE_LANE + 0.4
+SHARE_Y, SHARE_H, SHARE_GAP = SHARE_TITLE_Y + TEXT_LINE, 3.4, 0.8
+B_END = SHARE_Y + len(families) * SHARE_H + (len(families) - 1) * SHARE_GAP
+C_LANE = 5.2
+C_TOP = B_END + 6.0  # the state block starts anew, beside its heading
 C_END = C_TOP + len(COMPONENTS) * C_LANE - 0.6
 D_HEAD = C_END + TEXT_LINE + 2.6
 RATE_Y0, WAVE_Y0, WAVE_Y1 = D_HEAD + 3.0, D_HEAD + 8.4, D_HEAD + 18.4
@@ -126,66 +129,90 @@ def time_to_mm(t):
 # the guide at the transient runs behind every row of the right column
 canvas.plot([time_to_mm(TRANSIENT_S)] * 2, [B_TOP - 1.0, WAVE_Y1], color="#d6d6d6", lw=0.6, zorder=0)
 
-# a: where the observations are measured
+# a: where the observations are measured. The drawing is scaled by SCALE_A from its unit design (line weights and
+# type size unchanged) so that it fills the left column from the heading down to one text line above heading c.
 heading(0.5, 4.0, "a", "Measurement regions")
-cx, top = 20.0, 9.0
-canvas.add_patch(Ellipse((cx, top + 6.0), 8.6, 10.6, fc="none", ec=OUTLINE, lw=0.7))
-body = Path([(cx - 3.0, top + 11.0), (cx - 3.0, top + 13.4), (cx - 15.0, top + 15.2), (cx - 18.6, top + 18.4),
-             (cx - 19.6, top + 30.0), (cx + 19.6, top + 30.0), (cx + 18.6, top + 18.4), (cx + 15.0, top + 15.2),
-             (cx + 3.0, top + 13.4), (cx + 3.0, top + 11.0)],
+SCALE_A = 1.35
+cx, top = 27.5, 9.0
+
+
+def at(dx, dy):
+    """A point of the unit design (mm from the body's centre line and from its top), scaled."""
+    return cx + dx * SCALE_A, top + dy * SCALE_A
+
+
+canvas.add_patch(Ellipse(at(0, 6.0), 8.6 * SCALE_A, 10.6 * SCALE_A, fc="none", ec=OUTLINE, lw=0.7))
+body = Path([at(-3.0, 11.0), at(-3.0, 13.4), at(-15.0, 15.2), at(-18.6, 18.4), at(-19.6, 30.0), at(19.6, 30.0),
+             at(18.6, 18.4), at(15.0, 15.2), at(3.0, 13.4), at(3.0, 11.0)],
             [Path.MOVETO, Path.LINETO, Path.CURVE3, Path.CURVE3, Path.LINETO, Path.MOVETO, Path.LINETO,
              Path.CURVE3, Path.CURVE3, Path.LINETO])
 canvas.add_patch(PathPatch(body, fc="none", ec=OUTLINE, lw=0.7))
-shoulder_y, span = top + 15.6, 27.0
-strip_height = 0.2 * span
-canvas.add_patch(Rectangle((cx - span / 2, shoulder_y - strip_height / 2), span, strip_height, fc="none", ec=CHEST,
-                           lw=0.8))
-canvas.add_patch(Rectangle((cx - 9.5, top + 12.0), 19.0, 18.0, fc="none", ec=TORSO, lw=0.8, ls=(0, (2.2, 1.2))))
-for x in (cx - span / 2, cx + span / 2):
-    canvas.add_patch(Circle((x, shoulder_y), 0.75, fc="white", ec=INK, lw=0.5, zorder=3))
+SPAN_A = 27.0
+strip_x0, strip_y0 = at(-SPAN_A / 2, 15.6 - 0.1 * SPAN_A)
+canvas.add_patch(Rectangle((strip_x0, strip_y0), SPAN_A * SCALE_A, 0.2 * SPAN_A * SCALE_A, fc="none", ec=CHEST, lw=0.8))
+box_x0, box_y0 = at(-9.5, 12.0)
+canvas.add_patch(Rectangle((box_x0, box_y0), 19.0 * SCALE_A, 18.0 * SCALE_A, fc="none", ec=TORSO, lw=0.8,
+                           ls=(0, (2.2, 1.2))))
+for dx in (-SPAN_A / 2, SPAN_A / 2):
+    canvas.add_patch(Circle(at(dx, 15.6), 0.75 * SCALE_A, fc="white", ec=INK, lw=0.5, zorder=3))
 # breathing motion, inside the torso box
-canvas.add_patch(FancyArrowPatch((cx - 5.4, top + 19.6), (cx - 5.4, top + 27.0),
-                                 arrowstyle="<|-|>,head_width=0.8,head_length=1.3", mutation_scale=1, lw=0.5,
-                                 color=INK, shrinkA=0, shrinkB=0))
-canvas.text(cx - 3.8, top + 23.3, "Breathing\nmotion", fontsize=5.5, va="center", linespacing=1.1)
-# direct labels beside the marks, each joined to its mark by a hairline
-LABEL_A = 42.5
-for (x0, y0), (x1, y1), text, colour in [
-        ((cx + span / 2 + 0.7, shoulder_y - 0.4), (LABEL_A - 1.0, shoulder_y - 5.6), "Shoulder landmark", INK),
-        ((cx + span / 2, shoulder_y + strip_height / 2), (LABEL_A - 1.0, shoulder_y + strip_height / 2), "Chest strip", CHEST),
-        ((cx + 9.5, top + 28.4), (LABEL_A - 1.0, top + 28.4), "Torso box", TORSO)]:
-    canvas.plot([x0, x1], [y0, y1], color=GUIDE, lw=0.35)
-    canvas.text(LABEL_A, y1, text, fontsize=5.5, va="center", color=colour)
+canvas.add_patch(FancyArrowPatch(at(-5.4, 19.6), at(-5.4, 27.0), arrowstyle="<|-|>,head_width=0.8,head_length=1.3",
+                                 mutation_scale=1, lw=0.5, color=INK, shrinkA=0, shrinkB=0))
+canvas.text(*at(-3.8, 23.3), "Breathing\nmotion", fontsize=5.5, va="center", linespacing=1.1)
+# direct labels, each joined by a hairline that ends inside its region and is one shade darker than the outline
+LEADER = dict(color=NEUTRAL, lw=0.4, zorder=2)
+landmark_x, landmark_y = at(SPAN_A / 2, 15.6)
+canvas.text(landmark_x + 3.0, top + 1.0, "Shoulder landmark", fontsize=5.5, va="center", ha="right", color=INK)
+# an elbow that stays right of the strip: down beside its right edge, then into the right side of the circle
+elbow_x = landmark_x + 2.4
+canvas.plot([elbow_x, elbow_x, landmark_x + 0.75 * SCALE_A], [top + 2.6, landmark_y, landmark_y], **LEADER)
+strip_leader_x = cx - 15.5
+canvas.text(strip_leader_x, top + 1.0, "Chest strip", fontsize=5.5, va="center", ha="center", color=CHEST)
+# the shoulder outline (a quadratic curve of the body path) at the leader's x; the leader ends midway between the
+# strip's top edge and that outline, touching neither
+t = np.linspace(0, 1, 2001)
+curve_x = (1 - t) ** 2 * -3.0 + 2 * t * (1 - t) * -15.0 + t ** 2 * -18.6
+curve_y = (1 - t) ** 2 * 13.4 + 2 * t * (1 - t) * 15.2 + t ** 2 * 18.4
+outline_y = top + curve_y[np.argmin(np.abs(curve_x * SCALE_A - (strip_leader_x - cx)))] * SCALE_A
+strip_top = top + (15.6 - 0.1 * SPAN_A) * SCALE_A
+canvas.plot([strip_leader_x] * 2, [top + 2.6, (strip_top + outline_y) / 2], **LEADER)
+torso_label_x, torso_label_y = at(14.2 / SCALE_A, 27.0)[0], at(0, 27.0)[1]
+canvas.text(torso_label_x, torso_label_y, "Torso box", fontsize=5.5, va="center", color=TORSO)
+canvas.plot([torso_label_x - 0.6, at(7.0, 0)[0]], [torso_label_y] * 2, **LEADER)
 
-# b: observations over their share of the update
+# b: the three observations, then the share of each in the Kalman update
 heading(LEFT_X, 4.0, "b", "Observations and their share of the update")
 for k, family in enumerate(families):
     label, _, colour = FAMILIES[family]
-    y0 = B_TOP + k * LANE
+    y0 = B_TOP + k * TRACE_LANE
     trace_axes = axes_mm(PLOT_X0, y0, PLOT_X1, y0 + TRACE_H)
     time, z = shown(scaled[family])
     beyond = draw_trace(trace_axes, time, z, OBS, lw=0.45)
     trace_axes.set_ylim(-3.2, 3.2)
     if k == 0 and beyond.any():
-        # the first compressed stretch is named once, in its own tone, beside its end
         # named beside the plateau: right of the end of the compressed stretch that holds the largest value
         peak = int(np.argmax(np.where(beyond, np.abs(z), -1)))
         end = peak + int(np.argmin(beyond[peak:]))
         trace_axes.text(time[end] + 0.5, 3.0, "compressed", fontsize=5, color=lighter(OBS, 0.3), va="top")
-    share_y = y0 + TRACE_H + 0.4
-    share_axes = axes_mm(PLOT_X0, share_y, PLOT_X1, share_y + SHARE_H)
+    row_label(y0 + TRACE_H / 2, label)
+row_label(SHARE_TITLE_Y + TEXT_LINE / 2 - 0.4, "Update share")
+for k, family in enumerate(families):
+    label, _, colour = FAMILIES[family]
+    y0 = SHARE_Y + k * (SHARE_H + SHARE_GAP)
+    share_axes = axes_mm(PLOT_X0, y0, PLOT_X1, y0 + SHARE_H)
     share_time, share = shown(update_share[k])
     draw_share(share_axes, share_time, share, colour)
-    row_label(y0 + TRACE_H / 2, label)
+    row_label(y0 + SHARE_H / 2, label)
     if k == 0:
-        row_label(share_y + SHARE_H / 2, "Update share")
-        canvas.plot([PLOT_X0 - 1.2] * 2, [share_y, share_y + SHARE_H], color=INK, lw=0.4)
-        for value, y in ((1, share_y), (0, share_y + SHARE_H)):
+        canvas.plot([PLOT_X0 - 1.2] * 2, [y0, y0 + SHARE_H], color=INK, lw=0.4)
+        for value, y in ((1, y0), (0, y0 + SHARE_H)):
             canvas.text(PLOT_X0 - 2.0, y, str(value), fontsize=4.5, ha="right", va="center")
 
-# c: the state-space model (left) and its smoothed state components (right)
+# c: the state-space model (left) and its smoothed state components (right). The node x_t sits below the middle of
+# the bracket that spans the state components, so that its connector runs up to the middle of the bracket.
 heading(0.5, C_TOP + 2.0, "c", "State-space model and latent state")
-state_y = C_TOP + 13.0
+bracket_x, connector_y = LEFT_X + 0.8, (C_TOP + C_END) / 2
+state_y = connector_y + 3.4 + 2.6
 observation_y = state_y + 19.0
 for x, name in [(9.0, "$\\mathbf{x}_{t-1}$"), (25.0, "$\\mathbf{x}_t$"), (41.0, "$\\mathbf{x}_{t+1}$")]:
     canvas.add_patch(Circle((x, state_y), 3.4, fc="white", ec=INK, lw=0.6))
@@ -193,18 +220,16 @@ for x, name in [(9.0, "$\\mathbf{x}_{t-1}$"), (25.0, "$\\mathbf{x}_t$"), (41.0, 
 for x0 in (9.0, 25.0):
     arrow((x0 + 3.4, state_y), (x0 + 12.6, state_y))
     canvas.text(x0 + 8.0, state_y - 1.6, "$F_t$", fontsize=5.5, ha="center", va="baseline")
+BOX_W, BOX_H = 13.6, 6.2
 for k, family in enumerate(families):
     _, label, colour = FAMILIES[family]
-    x = 25.0 + (k - (len(families) - 1) / 2) * 14.0
-    canvas.add_patch(FancyBboxPatch((x - 6.0, observation_y - 2.0), 12.0, 4.0,
+    x = 25.0 + (k - (len(families) - 1) / 2) * 15.2
+    canvas.add_patch(FancyBboxPatch((x - BOX_W / 2, observation_y - BOX_H / 2), BOX_W, BOX_H,
                                     boxstyle="round,pad=0,rounding_size=0.8", fc="white", ec=colour, lw=0.7))
-    canvas.text(x, observation_y, label, fontsize=5.5, ha="center", va="center")
-    arrow((25.0, state_y + 3.4), (x, observation_y - 2.0))
+    canvas.text(x, observation_y, label.replace("Torso disp.", "Torso\ndisplacement"), fontsize=5.5, ha="center",
+                va="center", linespacing=1.1)
+    arrow((25.0, state_y + 3.4), (x, observation_y - BOX_H / 2))
 canvas.text(26.6, state_y + 8.2, "$H_t$", fontsize=5.5, va="center")
-canvas.text(1.0, observation_y + 7.4, "$\\mathbf{x}_t = F_t\\mathbf{x}_{t-1} + \\mathbf{w}_t$,  "
-            "$\\mathbf{y}_t = H_t\\mathbf{x}_t + \\mathbf{v}_t$", fontsize=6, va="center")
-canvas.text(1.0, observation_y + 11.4, "$\\mathbf{v}_t \\sim \\mathcal{N}(\\mathbf{0},\\,\\mathrm{diag}\\,R^{\\mathrm{eff}}_{k,t})$,  "
-            "$R^{\\mathrm{eff}}_{k,t} \\propto R^{\\mathrm{self}}_{k,t}\\,/\\,\\pi_{k,t}$", fontsize=6, va="center")
 decomposition = estimate["decomposition"]
 fundamental_scale = 1.4826 * np.median(np.abs(np.asarray(decomposition["h1"], float)))
 for k, (key, label, gain) in enumerate(COMPONENTS):
@@ -214,10 +239,8 @@ for k, (key, label, gain) in enumerate(COMPONENTS):
     ax.plot(time, values, color=PARH if key == "h1" else OBS, lw=0.5)
     ax.set_ylim(-2.2, 2.2)
     row_label(y0 + (C_LANE - 0.6) / 2, label)
-# one connector from the node x_t to the stack of state components, which a bracket spans
-bracket_x = LEFT_X + 0.8
+# one connector from the node x_t to the middle of the bracket that spans the state components
 canvas.plot([bracket_x] * 2, [C_TOP, C_END], color=INK, lw=0.5)
-connector_y = C_TOP + 5.2
 canvas.plot([25.0, 25.0], [state_y - 3.4, connector_y], color=INK, lw=0.5)
 arrow((25.0, connector_y), (bracket_x, connector_y))
 
