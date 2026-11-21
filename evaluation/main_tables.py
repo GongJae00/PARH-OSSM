@@ -4,6 +4,7 @@ Scored as three_reference_summary.py and confirmatory_test.py score: per trial a
 mean |estimate - reference| over the windows where both exist, with at least 10 such windows, on the trials
 where direct P1D is computable. Each row gives the median trial MAE under the Hilbert, Welch, and breath-count
 references, then, under the Hilbert reference, which the figures and in-text values use: the median trial RMSE,
+the 90th percentile of the trial MAE over the scored trials (the large errors),
 the median within-trial Pearson correlation between the window estimates and the window references (tracking
 within a trial), the least-squares slope of the trial-mean estimate on the trial-mean reference over the scored
 trials (1 when the estimate follows the differences between trials, 0 when it outputs one rate for all of them),
@@ -74,6 +75,7 @@ medians = scores.groupby(["method", "reference"])[["MAE", "RMSE", "r"]].median()
 hilbert = scores[scores.reference == "hilbert"]
 trials = hilbert.groupby("method").trial.nunique()
 slope = {method: linregress(t.mean_reference, t.mean_estimate).slope for method, t in hilbert.groupby("method")}
+large_error = hilbert.groupby("method").MAE.quantile(0.9)
 print(f"% {dataset}: {windows.trial.nunique()} trials, {windows.subject.nunique()} subjects "
       f"(split {evaluated_split}); breath-count reference in {scores[scores.reference == 'count'].trial.nunique()} trials")
 for method in methods:
@@ -81,4 +83,5 @@ for method in methods:
     rmse = medians.loc[(method, "hilbert"), "RMSE"]
     correlation = medians.loc[(method, "hilbert"), "r"]
     correlation = "--" if np.isnan(correlation) else f"{correlation:.2f}"
-    print(f"{method} & {rate_source[method]} & {mae} & {rmse:.2f} & {correlation} & {slope[method]:.2f} & {trials[method]} \\\\")
+    print(f"{method} & {rate_source[method]} & {mae} & {rmse:.2f} & {large_error[method]:.2f} & {correlation} & "
+          f"{slope[method]:.2f} & {trials[method]} \\\\")

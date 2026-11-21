@@ -207,7 +207,7 @@ for table, name in [("2", "rate"), ("3", "stages")]:
         block = mahnob[(placement, split, table)]
         position = "starts at the stimulus onset" if placement == "onset" else "ends with the recording"
         who = {"test": "test participants", "development": "development participants", "all": "all participants"}[split]
-        lines.append(f"\\multicolumn{{9}}{{@{{}}l}}{{\\textit{{Video {position}; {block['subjects']} {who}, {block['trials']} trials}}}} \\\\")
+        lines.append(f"\\multicolumn{{10}}{{@{{}}l}}{{\\textit{{Video {position}; {block['subjects']} {who}, {block['trials']} trials}}}} \\\\")
         lines += block["rows"] + ["\\addlinespace"]
     write_rows(f"S_{name}_mahnob.tex", lines[:-1])
 print(f"wrote {len(REFERENCES) + 12} table bodies to {out_dir}")
