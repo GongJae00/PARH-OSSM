@@ -30,7 +30,7 @@ def compare(frozen_path, split_path, evaluated_split, comparator_args):
     windows = windows.rename(columns={"parh_track_bpm": "frozen"})
     controls = []
     for argument in comparator_args:
-        name, source = argument.split("=")
+        name, source = argument.split("=", 1)
         path, column = source.rsplit(":", 1)
         rates = pd.read_csv(path)[["trial", "window", column]].rename(columns={column: name})
         windows = windows.merge(rates, on=["trial", "window"], how="left")

@@ -1,8 +1,8 @@
 """How far each method and each stage of PARH-OSSM follows the differences in rate between trials.
 
 Per method or stage, the trial-mean estimate is regressed on the trial-mean reference over the windows where both
-exist (at least 10 per trial, as in rate_agreement.py). A slope near 1 follows the between-trial differences of the
-reference; a slope near 0 does not, whether the trial means scatter (noise) or gather (a pull toward one rate). The
+exist (at least 10 per trial, on the trials with direct P1D, as in rate_agreement.py and main_tables.py).
+A slope near 1 follows the between-trial differences of the reference; a slope near 0 does not, whether the trial means scatter (noise) or gather (a pull toward one rate). The
 SD and median of the trial means tell the two apart and show where they gather. The code holds no population rate
 (the reliability priors are per-observation scores, and the initial frequency comes from each video's first 10 s);
 observation_track_slope.py shows whether the observations already gather before they are combined.
@@ -36,6 +36,8 @@ else:
 windows = pd.read_csv(os.path.join(records_dir, frozen))
 if trials is not None:
     windows = windows[windows.trial.isin(trials)]
+# the trials where direct P1D is computable, the common set of Tables 2 and 3 (main_tables.py)
+windows = windows[windows.trial.isin(windows.dropna(subset=["direct_p1d_welch_bpm"]).trial.unique())]
 references = windows[["trial", "window", f"{reference}_reference_bpm"]]
 fused = pd.read_csv(os.path.join(records_dir, fusion))
 sources = [("Direct P1D quadratic", windows, "direct_p1d_welch_bpm"), ("Direct torso displacement", fused, "direct_torso_bpm"),

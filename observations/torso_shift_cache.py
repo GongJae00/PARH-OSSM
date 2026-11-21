@@ -1,8 +1,9 @@
-"""Compute the torso_shift observation (components/observations/motion.py) for every trial, outside the dataset tree.
+"""Compute the torso displacement observation (torso_shift in observations/chest_motion.py) for every trial, outside
+the dataset tree.
 
 The pipeline reads observation caches from the trial folder of the video, which for the original
-datasets is read-only; run_base_shards.py copies obs_* files into its mirror folders, so the caches
-are written here as <out dir>/<trial>.npy and copied into the mirrors as obs_torso_shift.npy.
+datasets is read-only; observations/run_shards.py copies obs_* files into its mirror folders, so the caches
+are written here as <out dir>/<trial>.npy and copied into the mirrors as obs_torso_shift.npy (--torso-cache).
 MAHNOB-HCI development subjects come first, interleaved across subjects, so that development work
 can start before the test subjects finish.
 

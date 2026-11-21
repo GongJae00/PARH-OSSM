@@ -55,5 +55,6 @@ def _windowed_track_bpm(
         [np.nanmean(gt_interp[s:s + win_frames]) * 60.0 for s in starts],
         dtype=np.float64,
     )
-    finite = np.isfinite(est_bpm) & np.isfinite(gt_bpm)
-    return est_bpm[finite], gt_bpm[finite]
+    # windows stay in place, NaN where a track has no finite sample, so that window w of every method and of every
+    # reference is the same 30 s of video
+    return est_bpm, gt_bpm

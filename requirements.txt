@@ -3,6 +3,8 @@ scipy<1.14
 pandas<2.3
 h5py
 pyedflib
+matplotlib<3.10
+pytest
 tqdm==4.66.4
 Pillow==10.3.0
 opencv-python==4.7.0.72

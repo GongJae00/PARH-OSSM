@@ -43,3 +43,15 @@ def test_windowed_track_averages_both_tracks_over_the_same_windows():
     assert estimate_bpm.size == (600 - 300) // 10 + 1
     assert np.allclose(estimate_bpm, 15.0)
     assert np.allclose(reference_bpm, 12.0)
+
+
+def test_windowed_track_keeps_a_window_without_estimate_in_place():
+    fps = 10.0
+    estimate_hz = np.full(600, 0.25)
+    estimate_hz[:400] = np.nan
+    reference_hz = np.full(2000, 0.20)
+
+    estimate_bpm, reference_bpm = _windowed_track_bpm(estimate_hz, reference_hz, fps, 33.3, 30.0, 1.0)
+
+    assert estimate_bpm.size == reference_bpm.size == (600 - 300) // 10 + 1
+    assert np.isnan(estimate_bpm[:11]).all() and np.allclose(estimate_bpm[11:], 15.0)

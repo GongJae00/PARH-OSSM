@@ -78,7 +78,8 @@ def main():
         processes.append(subprocess.Popen(command, cwd=REPO, stdout=open(os.path.join(shard_root, "extract.log"), "w"),
                                           stderr=subprocess.STDOUT))
     print("launched", len(processes), "shards", flush=True)
-    print("exit codes", [p.wait() for p in processes], flush=True)
+    exit_codes = [p.wait() for p in processes]
+    print("exit codes", exit_codes, flush=True)
 
     combined = os.path.join(args.work, "data")
     os.makedirs(combined, exist_ok=True)
@@ -91,7 +92,9 @@ def main():
                 if not os.path.lexists(target):
                     os.symlink(os.path.join(data_dir, name), target)
     print("pkls", len(os.listdir(combined)), flush=True)
+    # a failed shard leaves its trials out of <work>/data; the exit status makes a driver stop there
+    return 1 if any(exit_codes) else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

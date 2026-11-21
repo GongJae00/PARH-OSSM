@@ -128,7 +128,7 @@ class OF_Model(MethodBase):
 
 
 class TorsoShift_Model(MethodBase):
-	"""Face-anchored torso displacement (motion.torso_shift); it reads the video, not the chest ROI strip."""
+	"""Face-anchored torso displacement (chest_motion.torso_shift); it reads the video, not the chest ROI strip."""
 
 	def __init__(self):
 		super().__init__()

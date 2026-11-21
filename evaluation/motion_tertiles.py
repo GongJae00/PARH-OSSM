@@ -9,10 +9,12 @@ before any error was split by them.
 
 Trials are split into motion tertiles within each dataset. Per trial, MAE against a reference is the
 mean |estimate - reference| over windows where both exist, with at least 10 such windows, and the
-constant predictor outputs the median over trials of the reference's trial mean, as in
-three_reference_summary.py. The per-trial motion, tertile, and MAE go to a CSV for the Supplementary table.
+constant predictor outputs the median trial-mean reference of the development trials, as in main_tables.py.
+With a split csv (MAHNOB-HCI), the constant comes from the development trials and the test trials alone are
+scored and split into tertiles; without one (COHFACE), every trial is development data and is scored. The
+per-trial motion, tertile, and MAE go to a CSV for the Supplementary table.
 
-usage: motion_tertiles.py <dataset name> <window-rate csv> <head_motion_trials.csv> <trial csv out>
+usage: motion_tertiles.py <dataset name> <window-rate csv> <head_motion_trials.csv> <trial csv out> [split csv]
 """
 import sys
 
@@ -32,12 +34,17 @@ motion = (pd.read_csv(motion_csv)
 
 windows = windows[windows.trial.isin(windows.dropna(subset=["direct_p1d_welch_bpm"]).trial.unique())]
 trial_means = windows.groupby("trial")[[f"{r}_reference_bpm" for r in REFERENCES]].mean()
+cohort_rate = trial_means.median()
+if len(sys.argv) > 5:
+    split = pd.read_csv(sys.argv[5])
+    cohort_rate = trial_means[trial_means.index.isin(split[split.split == "development"].trial)].median()
+    windows = windows[windows.trial.isin(split[split.split == "test"].trial)]
 rows = []
 for trial, w in windows.groupby("trial"):
     for r in REFERENCES:
         reference = w[f"{r}_reference_bpm"]
         for m in METHODS:
-            estimate = (pd.Series(trial_means[f"{r}_reference_bpm"].median(), index=w.index) if m == "constant"
+            estimate = (pd.Series(cohort_rate[f"{r}_reference_bpm"], index=w.index) if m == "constant"
                         else w[f"{m}_bpm"])
             valid = reference.notna() & estimate.notna()
             if valid.sum() >= MIN_WINDOWS:

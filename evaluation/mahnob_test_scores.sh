@@ -4,8 +4,9 @@
 # ladder, and the leave-one-out runs, once per belt placement. This computes test-subject errors, so run it only
 # when the placement is settled. It reads the CSVs of evaluation/window_rates.sh and evaluation/bank_rates.sh.
 # It then writes the waveform agreement of the frozen run under both placements with the phase-randomized null and the
-# rows of the waveform table, the frozen run's trial means and head-motion tertiles on all 488 trials (onset
-# placement), the slopes of the trial means by stage and of the observation tracks, and the Supplementary tables.
+# rows of the waveform table, the frozen run's trial means on all 488 trials and its head-motion tertiles on the test
+# trials (onset placement), the slopes of the trial means by stage and of the observation tracks, and the
+# Supplementary tables. The scripts that read the split from <records dir> get a copy of it there.
 # <base data dir> holds the pickles of observations/extract.py, <final data dir> those of the frozen run of
 # estimate/materialize.sh. The rows of Tables 2 and 3 come from evaluation/main_tables.sh mahnob.
 #
@@ -18,6 +19,7 @@ controls=(equal_readout shuffled_readout equal_filter)
 rungs=(plain_multichannel readout observation_law observability)
 exclusions=(no_torso no_of no_dof no_p1d no_bridges no_p1d_cubic no_p1d_consensus)
 mkdir -p "$out"
+cp "$split" "$records/"
 
 for placement in onset tail; do
   suffix=$([ $placement = onset ] && echo _onset || echo "")
@@ -45,7 +47,7 @@ python evaluation/rate_agreement.py MAHNOB-HCI "$records/mahnob_frozen_onset_win
   "$records/mahnob_observation_fusion_window_rates.csv:median_fusion_nine_bpm" "$records/rate_agreement/mahnob_frozen_onset_trial_means.csv" \
   "$split" > "$out/mahnob_frozen_onset_rate_agreement.txt"
 python evaluation/motion_tertiles.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
-  "$records/head_motion_trials.csv" "$records/rate_agreement/mahnob_frozen_onset_head_motion_trials.csv" \
+  "$records/head_motion_trials.csv" "$records/rate_agreement/mahnob_frozen_onset_head_motion_trials.csv" "$split" \
   > "$out/mahnob_frozen_onset_head_motion_tertiles.txt"
 for reference in hilbert welch count; do
   python evaluation/stage_slopes.py "$records" $reference mahnob test
