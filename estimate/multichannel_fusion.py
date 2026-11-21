@@ -3884,7 +3884,7 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
                 rate_track = np.full(signal.size, np.nan, dtype=np.float64)
             rate_tracks.append(_fit_length(rate_track, signal.size))
             names.append(family_name)
-        if len(channels) < 3:
+        if len(channels) < 2:
             return path.name, f"not enough channels ({len(channels)}), missing={missing}"
 
         reliability_by_video = cfg.get("reliability_priors_by_video", {})

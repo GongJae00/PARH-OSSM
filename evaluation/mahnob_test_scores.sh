@@ -31,6 +31,7 @@ if [ "$evaluated" = development ]; then
   scoring=$records/scoring_development
   mkdir -p "$scoring/data" "$scoring/final"
   for trial in $(awk -F, 'NR > 1 && $0 ~ /development/ {print $1}' "$split"); do
+    [ -f "$final/$trial.pkl" ] || continue  # two development sessions of the split are not among the 488 common sessions
     ln -sf "$(realpath "$base/$trial.pkl")" "$scoring/data/"; ln -sf "$(realpath "$final/$trial.pkl")" "$scoring/final/"
   done
   base=$scoring/data; final=$scoring/final
