@@ -36,25 +36,37 @@ observation law, the state-space model, and the separate rate and waveform outpu
    the single-observation method of the article. PARH-OSSM then filters the nine together as noisy views of one
    state: a breathing oscillation, its second harmonic for the asymmetry of inhalation and exhalation, a baseline
    drift, and an aperiodic residual, so that drift and irregular motion go to their own components rather than to
-   the oscillation. In this observation law, a trust computed from the video alone, from the filter's innovations,
-   the agreement between observations, and their target observability and signal quality, sets the measurement
-   variance of each observation in the Kalman filter and the Rauch–Tung–Striebel smoother. The waveform is read
-   from the smoothed state. The rate combines the phase rate of the smoothed oscillation with a readout of the
-   OSSM-KF tracks within the OF, DoF, and P1D families, weighted by reliability priors of each family and
-   corrected by a posterior over candidate rates. The priors are computed from the video observations alone,
-   and no step reads the respiratory belt. Table 3 of the article adds these parts one at a time: the
-   multichannel filter, the readout, the observation law, target observability and signal quality, and the rate
-   posterior, which completes PARH-OSSM.
+   the oscillation. The observation law sets how much each observation counts. The measurement variance of each
+   observation, estimated from its innovations, is divided by a trust computed at each frame from the quality of
+   those innovations, the agreement between observations in rate and phase, and target observability, which
+   scores how clearly the window shows one respiratory rate. The variances of all observations rise together
+   when that rate is ambiguous, and P1D quadratic and cubic, nearly the same measurement, count as one together. The Kalman filter and the
+   Rauch–Tung–Striebel smoother run with these variances, and the waveform is read from the smoothed state. The
+   rate combines the phase rate of the smoothed oscillation with a readout of the OSSM-KF tracks within the OF,
+   DoF, and P1D families, weighted by reliability priors of each family and corrected by a posterior over
+   candidate rates. Reliability thus enters twice, as the trust of each observation in the filter and as the
+   prior of each family in the readout; both are computed from the video observations alone, and no step reads
+   the respiratory belt. Table 3 of the article adds these parts one at a time: the multichannel filter, the
+   readout, the observation law, target observability and signal quality, and the rate posterior, which
+   completes PARH-OSSM. Three controls each remove one use of reliability and keep everything else:
+   `equal_filter` replaces the trust of each observation by its mean over the observations at the same frame,
+   `equal_readout` gives every family the mean of the family priors in each window, and `shuffled_readout`
+   permutes the windows of each family's priors within the trial.
 3. **Evaluation.** The rate is scored in 30-s windows under three definitions of the belt's rate (Hilbert, Welch,
    and breath count), because a method scores best under the definition that shares its estimator. It is compared
    with methods that read the same nine observations and with a constant predictor that outputs the typical rate
    of the cohort, which shows how much of a low error comes from staying near that rate; the slope of the
    trial-mean estimate on the trial-mean reference shows whether a method follows the differences in rate between
    trials. The waveform is scored by its concordance correlation coefficient (CCC) with the belt after a shift of
-   up to ±2 s, against the belts of other participants, which gives agreement by chance, and against
-   phase-randomized copies of the trial's own belt, which keep its rate and change only the timing of its breaths.
-   COHFACE was used to build the method. MAHNOB-HCI participants were split into 9 development and 18 test
-   participants, and the test participants were scored once, after the method was fixed.
+   up to ±2 s. Two nulls bound that agreement: the belts of other participants give the agreement expected by
+   chance, and phase-randomized copies of the trial's own belt keep its rate and change only the timing of its
+   breaths. COHFACE was used to build the method. MAHNOB-HCI participants were split into 9 development and 18
+   test participants, and the test participants were scored once, after the method was fixed, in six
+   confirmatory comparisons: PARH-OSSM against the constant predictor and against the submitted version of the
+   method, which reads the eight chest observations, under each reference definition, corrected together for
+   multiple testing. The MAHNOB-HCI belt recording is longer than the video and does not store where the video
+   lies in it, so the reference starts at the stimulus onset, the position the development participants
+   supported, and every MAHNOB-HCI result is also computed with the reference ending with the recording.
 
 ## Layout
 
@@ -62,8 +74,8 @@ The folders follow the computation, from video to the reported tables.
 
 ```
 observations/   video → chest region and torso box → the nine observations
-estimate/       OSSM-KF, PARH-OSSM, reliability priors, the stages and controls of Table 3
-evaluation/     belt references, window rates, tests, waveform agreement, table rows
+estimate/       OSSM-KF, PARH-OSSM, reliability priors, Table 3 stages, controls
+evaluation/     belt references, window rates, statistics, waveform agreement, table rows
 figures/        the figure scripts of the article
 configs/        extraction settings of the reported COHFACE and MAHNOB-HCI runs
 tests/          tests that pin the filters, the reference rates, and the controls
@@ -71,19 +83,31 @@ tests/          tests that pin the filters, the reference rates, and the control
 
 | In the article | Code |
 |---|---|
-| Video-derived observations | `observations/chest_roi.py`, `chest_motion.py`, `observation_signals.py` |
-| State-space model, observation law | `estimate/parh_ossm.py`, `multichannel_fusion.py` |
-| Reliability priors | `estimate/reliability_priors.py` |
+| Chest observations | `observations/chest_roi.py`, `chest_motion.py`, `observation_signals.py` |
+| Torso displacement | `observations/torso_shift_cache.py`, `estimate/merge_torso_rows.py` |
 | OSSM-KF | `estimate/ossm_kf.py` |
-| Stages and controls (Table 3) | `estimate/materialize.sh`, one run per stage or control |
-| Hilbert, Welch, and breath-count references | `evaluation/belt_reference.py`, `rate_tracks.py` |
-| Tables 2 and 3 | `evaluation/main_tables.sh`, `main_tables.py` |
-| Table 4, waveform agreement | `evaluation/bounded_lag_waveform.py`, `phase_randomized_null.py`, `onset_alignment_waveform.py`, `waveform_table.py` |
+| State-space model, observation law | `estimate/parh_ossm.py` |
+| Anchor alignment, readout, observability, rate posterior | `estimate/multichannel_fusion.py` |
+| Reliability priors | `estimate/reliability_priors.py` |
+| Stages (Table 3), controls | `estimate/materialize.sh`, one run each |
+| Belt references | `evaluation/belt_reference.py`, `rate_tracks.py` |
+| Onset placement, MAHNOB-HCI | `evaluation/onset_reference.py`, `onset_alignment_waveform.py` |
+| Sessions and split, MAHNOB-HCI | `evaluation/mahnob_common488_sessions.txt`, `mahnob_subject_split.csv` |
+| Tables 2 and 3, constant predictor | `evaluation/main_tables.sh`, `main_tables.py` |
+| Table 4, waveform agreement | `evaluation/bounded_lag_waveform.py`, `waveform_table.py` |
+| Waveform nulls | `evaluation/phase_randomized_null.py` |
 | Figure 2 | `figures/case_figure.py` |
-| Confirmatory tests on MAHNOB-HCI | `evaluation/confirmatory_test.py`, `mahnob_test_scores.sh` |
-| Agreement across trials (Supplementary) | `evaluation/rate_agreement.py`, `stage_slopes.py`, `observation_track_slope.py`, `figures/rate_agreement_figure.py` |
-| Error under motion | `evaluation/head_motion.py`, `motion_tertiles.py`, `torso_displacement_rms.py`, `motion_perturbation.sh` |
+| Confirmatory tests | `evaluation/confirmatory_test.py`, `mahnob_test_scores.sh` |
+| Agreement across trials | `evaluation/rate_agreement.py`, `stage_slopes.py`, `observation_track_slope.py` |
+| Agreement figures | `figures/rate_agreement_figure.py` |
+| Error under motion | `evaluation/head_motion.py`, `motion_tertiles.py`, `motion_perturbation.sh` |
+| Perturbation scale | `evaluation/torso_displacement_rms.py` |
 | Supplementary tables | `evaluation/cohface_scores.sh`, `supplementary_tables.py`, `parameter_table.py` |
+
+The stored records name the observations `of_farneback`, `of_disp_bridge`, `dof`, `dof_disp_bridge`,
+`profile1d_linear`, `profile1d_quadratic`, `profile1d_cubic`, `profile1d_consensus`, and `torso_shift`, in the
+order of item 1. A row ending in `__kfstd` holds the OSSM-KF track of one observation, and a row ending in
+`__parh_ossm` the PARH filter run on that observation alone.
 
 ## Running
 
