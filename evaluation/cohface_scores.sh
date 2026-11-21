@@ -19,7 +19,7 @@ records=$1; out=$2; base=$3; final=$4; jobs=$5
 frozen_csv=$records/cohface_frozen_window_rates_three_references.csv
 controls=(equal_readout shuffled_readout equal_filter)
 rungs=(plain_multichannel readout observation_law observability)
-exclusions=(no_torso no_of no_dof no_p1d)
+exclusions=($(python estimate/bank.py routes))
 perturbations=(translation:0.5 translation:1 translation:2 rotation:0.25 rotation:0.5 rotation:1
                brightness:0.01 brightness:0.02 brightness:0.05)
 mkdir -p "$out" "$records/rate_agreement"

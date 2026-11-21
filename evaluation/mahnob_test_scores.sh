@@ -22,7 +22,7 @@ records=$1; out=$2; base=$3; bank=$4; final=$5; mahnob=$6; jobs=$7; evaluated=${
 split=evaluation/mahnob_subject_split.csv
 controls=(equal_readout shuffled_readout equal_filter)
 rungs=(plain_multichannel readout observation_law observability)
-exclusions=(no_torso no_of no_dof no_p1d)
+exclusions=($(python estimate/bank.py routes))
 splits=$([ "$evaluated" = test ] && echo "test development all" || echo development)
 mkdir -p "$out" "$records/rate_agreement"
 cp "$split" "$records/"

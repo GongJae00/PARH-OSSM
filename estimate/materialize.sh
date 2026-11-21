@@ -10,7 +10,7 @@
 #   equal_readout       control: readout priors equal across observations in each window
 #   shuffled_readout    control: each observation's prior windows permuted within the trial
 #   equal_filter        control: the filter's per-observation trust replaced by its mean over observations
-#   no_of no_dof no_p1d no_torso
+#   no_<route>          (the names of ROUTES in estimate/bank.py: no_of no_dof no_p1d no_torso for the five-observation bank)
 #                       route exclusion: the frozen method on a copy of the bank's pickles without that
 #                       measurement route (no_of: OF; no_dof: DoF and the DoF bridge; no_p1d: P1D quadratic;
 #                       no_torso: torso displacement), with the priors of the full bank
@@ -37,7 +37,7 @@ case $variant in
     python estimate/reliability_controls.py "$priors" "${variant%_readout}" "$out/priors_group.csv"
     priors=$out/priors_group.csv ;;
   equal_filter) script=estimate/equal_filter_trust.py ;;
-  no_of|no_dof|no_p1d|no_torso)
+  no_*)
     python estimate/drop_observations.py "$data" "$out/data" "$variant"
     data=$out/data ;;
   *) echo "unknown run: $variant" >&2; exit 1 ;;

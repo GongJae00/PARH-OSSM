@@ -26,9 +26,12 @@ import pandas as pd
 from scipy.stats import false_discovery_control
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
+from bank import ROUTES as ROUTE_ROWS
 from reliability_controls_summary import compare
 
 records_dir, out_dir, MAHNOB_EVALUATED, ROUTES = sys.argv[1:5]
+ROUTE_NAMES = {name: row for name, (_, row) in ROUTE_ROWS.items()}
 REFERENCES = [("hilbert", "Hilbert"), ("welch", "Welch"), ("count", "Breath count")]
 METHODS = [("direct_p1d_welch", "Direct P1D quadratic"), ("median_fusion", "Median fusion"),
            ("ossm_kf_track", "OSSM-KF"), ("parh_track", "PARH-OSSM"), ("constant", "Constant predictor")]
@@ -139,8 +142,6 @@ with open(os.path.join(out_dir, "S_redundancy.tex"), "w") as f:
 # confirmatory tests score (reliability_controls_summary.compare): per reference, the median over subjects of the
 # per-subject median of (left-out MAE - frozen MAE), positive when the left-out observations lowered the error, and
 # the number of subjects with a positive value. MAHNOB-HCI rows are the test subjects under the primary placement.
-ROUTE_NAMES = {"no_torso": "Torso displacement left out", "no_of": "OF left out", "no_dof": "DoF and DoF bridge left out",
-               "no_p1d": "P1D quadratic left out"}
 EXCLUSIONS = [(name, ROUTE_NAMES[name]) for name in ROUTES.split(",")]
 EXCLUSION_DATASETS = [("cohface_frozen_window_rates_three_references.csv", "none", "all",
                        "cohface_{}_window_rates_three_references.csv"),

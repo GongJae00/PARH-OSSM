@@ -37,13 +37,14 @@ from matplotlib.transforms import offset_copy
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from evaluation.belt_reference import filter_RW, recorded_belt
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
+from bank import BANK
 from figure_style import INK, MM, NEUTRAL, OSSM, PARH
 
 matplotlib.use("pdf")
 WIN, MIN_WINDOWS, MIN_HZ, MAX_HZ = 30, 10, 0.08, 0.5
 OBSERVATION_START_SEC = 2.0
-OBSERVATIONS = [("of_farneback", "OF"), ("DoF", "DoF"), ("dof_disp_bridge", "DoF bridge"), ("profile1D quadratic", "P1D"),
-                ("torso_shift", "Torso displacement")]
+OBSERVATIONS = list(BANK.items())
 TRUST = LinearSegmentedColormap.from_list("trust", ["#f2f6fc", "#1d4f91"])
 BEYOND = 4
 LIGHTER = {INK: "#b4b4b4", NEUTRAL: "#d2d2d2", PARH: "#a8bfdf"}
