@@ -3,11 +3,14 @@
 Scored as three_reference_summary.py and confirmatory_test.py score: per trial and reference, the MAE is the
 mean |estimate - reference| over the windows where both exist, with at least 10 such windows, on the trials
 where direct P1D is computable. Each row gives the median trial MAE under the Hilbert, Welch, and breath-count
-references, then the median trial RMSE and the median within-trial Pearson correlation between the window
-estimates and the window references under the Hilbert reference, which the figures and in-text values use, and
-the number of trials scored against it. The constant predictor, the last row, outputs the median trial-mean
+references, then, under the Hilbert reference, which the figures and in-text values use: the median trial RMSE,
+the median within-trial Pearson correlation between the window estimates and the window references (tracking
+within a trial), the least-squares slope of the trial-mean estimate on the trial-mean reference over the scored
+trials (1 when the estimate follows the differences between trials, 0 when it outputs one rate for all of them),
+and the number of trials scored. The constant predictor, the last row, outputs the median trial-mean
 reference of the development trials (all trials for COHFACE, whose every trial is development data), so on
-MAHNOB-HCI test subjects it knows the population rate from other subjects only; it has no correlation.
+MAHNOB-HCI test subjects it knows the population rate from other subjects only; it has no correlation, and
+its slope is 0 by construction.
 
 usage: main_tables.py <dataset label> <split csv | none> <evaluated split: test | development | all>
                       "<method label>|<rate source>=<window rates csv>:<column>" ...
@@ -17,6 +20,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+from scipy.stats import linregress
 
 REFERENCES = ["hilbert", "welch", "count"]
 MIN_WINDOWS = 10
@@ -62,11 +66,14 @@ for trial, w in windows.groupby("trial"):
                 continue
             error = estimate[valid] - reference[valid]
             correlation = np.nan if estimate[valid].nunique() == 1 else np.corrcoef(estimate[valid], reference[valid])[0, 1]
-            rows.append((trial, r, method, np.abs(error).mean(), np.sqrt(np.mean(error ** 2)), correlation))
-scores = pd.DataFrame(rows, columns=["trial", "reference", "method", "MAE", "RMSE", "r"])
+            rows.append((trial, r, method, np.abs(error).mean(), np.sqrt(np.mean(error ** 2)), correlation,
+                         estimate[valid].mean(), reference[valid].mean()))
+scores = pd.DataFrame(rows, columns=["trial", "reference", "method", "MAE", "RMSE", "r", "mean_estimate", "mean_reference"])
 
 medians = scores.groupby(["method", "reference"])[["MAE", "RMSE", "r"]].median()
-trials = scores[scores.reference == "hilbert"].groupby("method").trial.nunique()
+hilbert = scores[scores.reference == "hilbert"]
+trials = hilbert.groupby("method").trial.nunique()
+slope = {method: linregress(t.mean_reference, t.mean_estimate).slope for method, t in hilbert.groupby("method")}
 print(f"% {dataset}: {windows.trial.nunique()} trials, {windows.subject.nunique()} subjects "
       f"(split {evaluated_split}); breath-count reference in {scores[scores.reference == 'count'].trial.nunique()} trials")
 for method in methods:
@@ -74,4 +81,4 @@ for method in methods:
     rmse = medians.loc[(method, "hilbert"), "RMSE"]
     correlation = medians.loc[(method, "hilbert"), "r"]
     correlation = "--" if np.isnan(correlation) else f"{correlation:.2f}"
-    print(f"{dataset} & {method} & {rate_source[method]} & {mae} & {rmse:.2f} & {correlation} & {trials[method]} \\\\")
+    print(f"{method} & {rate_source[method]} & {mae} & {rmse:.2f} & {correlation} & {slope[method]:.2f} & {trials[method]} \\\\")

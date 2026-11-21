@@ -25,7 +25,7 @@ table() {
     "Direct P1D quadratic|signal spectrum=$frozen:direct_p1d_welch_bpm" \
     "Direct torso displacement|signal spectrum=$fusion:direct_torso_bpm" \
     "Median fusion|signal spectra=$fusion:median_fusion_nine_bpm" \
-    "OSSM-KF comparator|frequency track=$frozen:ossm_kf_track_bpm" \
+    "OSSM-KF|frequency track=$frozen:ossm_kf_track_bpm" \
     "PARH-OSSM, chest observations only|posterior-refined track=$stage${chest_only}$end:parh_track_bpm" \
     "PARH-OSSM|posterior-refined track=$frozen:parh_track_bpm"
   echo "% Table 3"
