@@ -1,4 +1,4 @@
-"""Copy MAHNOB final PARH pickles with the reference placed at the stimulus onset instead of the BDF end (R2-5a).
+"""Copy MAHNOB final PARH pickles with the reference placed at the stimulus onset instead of the BDF end.
 
 The loader places the video at the end of the BDF record (tail alignment). Every MAHNOB-HCI BDF
 marks the stimulus onset at 30.0 s on its Status channel, and the waveform evidence on the

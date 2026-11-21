@@ -1,5 +1,4 @@
-"""Rows of the manuscript's respiratory-rate table (Table 2) for one dataset, as LaTeX (paper/revision/CHECKLIST.md,
-"본문 표의 MAHNOB-HCI 행").
+"""Rows of the manuscript's respiratory-rate table (Table 2) for one dataset, as LaTeX.
 
 Scored as three_reference_summary.py and confirmatory_test.py score: per trial and reference, the MAE is the
 mean |estimate - reference| over the windows where both exist, with at least 10 such windows, on the trials

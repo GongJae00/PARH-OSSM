@@ -1,4 +1,4 @@
-"""R1-4b: error of each method on the perturbed COHFACE copies against the unperturbed run (CHECKLIST, R1-4b).
+"""Error of each method on the perturbed COHFACE copies against the unperturbed run.
 
 One trial per subject (cohface_perturbation_trials.txt), so a trial stands for its subject. Scored as main_tables.py
 scores: the trial MAE is the mean |estimate - reference| over the windows where both exist, with at least 10 such

@@ -1,4 +1,4 @@
-"""R2-2: agreement of the trial-mean rate with the reference (scatter, Bland-Altman, rate terciles).
+"""Agreement of the trial-mean rate with the reference (scatter, Bland-Altman, rate terciles).
 
 Every method is scored against each of the three reference definitions on the same windows
 (window_rates_three_references.py, plus median_fusion_window_rates.py). Per trial and reference,

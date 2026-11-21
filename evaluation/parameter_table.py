@@ -1,22 +1,21 @@
-"""Rows of the Supplementary parameter table (R2-4), read from the code that produced the reported runs.
+"""Rows of the Supplementary parameter table, read from the code that produced the reported runs.
 
-Each value is read from a fresh PARH-OSSM head (the materializer builds the head without parameters and
-the runs set no RESPYRE_PARH_* override; the pickle meta of the frozen runs carries the same values) or
+Each value is read from a fresh PARH-OSSM head (the materializer builds the head without parameters, and
+the pickle meta of the frozen runs carries the same values) or
 from the materializer module, so the typeset table cannot drift from the code. The last column names the
 constants or parameter fields in the code, which stay findable when lines move. The last block lists the
 terms the code defines but
-the reported configuration never applies, with the condition that keeps them off
-(r2_4_parameter_inventory.md, section C).
+the reported configuration never applies, with the condition that keeps them off.
 
 usage: parameter_table.py > supplementary_parameter_table.tex
 """
 import os
 import sys
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, REPO)
 from estimate.parh_ossm import oscillator_PARH_OSSM
-import scripts.materialize_calibrated_multifamily_parh_system as materializer
+import estimate.multichannel_fusion as materializer
 
 head = oscillator_PARH_OSSM()
 

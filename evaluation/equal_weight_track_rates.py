@@ -1,4 +1,4 @@
-"""Per-window rate of the nine observations' OSSM-KF rate tracks combined without weights (W5, control 1).
+"""Per-window rate of the nine observations' OSSM-KF rate tracks combined without weights.
 
 The PARH readout combines the observations' OSSM-KF tracks (external rate evidence ossm_kfstd) with
 reliability weights; this control gives every observation the same weight, as the quality-weighting

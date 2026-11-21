@@ -1,4 +1,4 @@
-"""Control reliability priors for W5: the frozen PARH with its readout reliability equalized or window-shuffled.
+"""Control reliability priors: the frozen PARH with its readout reliability equalized or window-shuffled.
 
 The readout (reliability_prior_scope readout_only) weights each observation family's rate candidate by the
 GT-free prior of priors_group.csv, one row per trial, family and 30-s window (10-s stride). Two controls

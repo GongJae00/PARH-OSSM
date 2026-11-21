@@ -1,4 +1,4 @@
-"""The frozen PARH against its reliability controls (W5; declared in paper/revision/CHECKLIST.md before scoring).
+"""The frozen PARH against its reliability controls.
 
 Scored as confirmatory_test.py scores the frozen method: per trial and reference the MAE over the windows
 where both exist, with at least 10 such windows, on the trials where direct P1D is computable; per subject

@@ -1,9 +1,9 @@
-"""How redundant are the nine observations the method reads? (R1-2: several channels look like variants.)
+"""How redundant are the nine observations the method reads?
 
 For every pair of observations in a trial this measures two things on the per-observation pickles that
 PARH-OSSM reads (the signal_hat of each plain estimate):
 - waveform similarity: the largest |normalised cross-correlation| of the band-passed (0.08-0.5 Hz)
-  signals within +-3 s, so that P1D, a velocity-like shift (F4), is not penalised for leading the
+  signals within +-3 s, so that P1D, a velocity-like shift, is not penalised for leading the
   displacement-like observations by a quarter cycle;
 - rate agreement: the median |difference| of the two observations' 30-s window rates (Welch peak,
   1-s stride, as window_rates_three_references.py scores direct P1D), the quantity the fusion reports.

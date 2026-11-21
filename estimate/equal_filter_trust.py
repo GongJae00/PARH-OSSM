@@ -1,4 +1,4 @@
-"""Run the PARH materializer with the filter's per-observation trust equalized across observations (W5).
+"""Run the PARH materializer with the filter's per-observation trust equalized across observations.
 
 Inside the multichannel filter each observation's noise is R_eff = R_t / pi_t, where pi_t is the
 reliability-weighted trust of that observation at that frame (parh_ossm.py, "Effective R with prior
@@ -8,12 +8,12 @@ another. Setting pi_t to 1 instead would also raise the overall trust and confou
 innovation-calibrated noise, is left as it is. The module is re-executed with the patched line before the
 materializer imports the class, and its worker processes are forked afterwards.
 
-usage: equal_filter_trust.py <materializer arguments>
+usage (from the repository root): python estimate/equal_filter_trust.py <arguments of estimate/multichannel_fusion.py>
 """
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import estimate.parh_ossm as parh_module
 
 trust_line = "R_eff = np.asarray(R_t, dtype=np.float64) / np.maximum(np.asarray(pi_t, dtype=np.float64), 1e-6)"
@@ -22,7 +22,7 @@ source = open(parh_module.__file__).read()
 assert source.count(trust_line) == 1
 exec(compile(source.replace(trust_line, equal_trust_line), parh_module.__file__, "exec"), parh_module.__dict__)
 
-import scripts.materialize_calibrated_multifamily_parh_system as materializer
+import estimate.multichannel_fusion as materializer
 
-sys.argv = ["materialize_calibrated_multifamily_parh_system.py", *sys.argv[1:]]
+sys.argv = ["multichannel_fusion.py", *sys.argv[1:]]
 sys.exit(materializer.main())

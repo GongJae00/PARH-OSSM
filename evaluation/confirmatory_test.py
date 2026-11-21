@@ -1,4 +1,4 @@
-"""The confirmatory comparison on the MAHNOB-HCI test subjects (declared in paper/revision/CHECKLIST.md).
+"""The confirmatory comparison on the MAHNOB-HCI test subjects.
 
 Six subject-level comparisons form one Benjamini-Hochberg family: the frozen method against the
 constant predictor and against the submitted PARH, under each of the three reference definitions.

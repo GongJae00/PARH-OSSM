@@ -1,4 +1,4 @@
-"""Per-window rates of every method against three reference-rate definitions (W1, F13).
+"""Per-window rates of every method against three reference-rate definitions.
 
 The paper scores spectral estimates (direct P1D) against the Welch peak of the belt window and
 track estimates (OSSM-KF, PARH) against the window mean of the belt's Hilbert frequency. Each
@@ -26,7 +26,7 @@ from multiprocessing import Pool
 import numpy as np
 from scipy.signal import argrelextrema
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from evaluation.belt_reference import filter_RW, recorded_belt, sig_windowing, sig_to_RPM
 from evaluation.rate_tracks import _instantaneous_freq_hz, _windowed_track_bpm
 

@@ -1,7 +1,7 @@
 """Add the torso_shift rows to copies of the session pickles (the nine-family bank).
 
 The base pickles hold the eight observations and their per-observation OSSM-KF and PARH rows; a
-run of main.py with only the torso_shift methods (run_base_shards.py with a torso cache directory)
+run of observations/extract.py with only the torso_shift methods (observations/run_shards.py with a torso cache folder)
 holds the same three rows for the new observation. Appending them to a copy leaves every other row
 unchanged, so materializing PARH on the copies differs from the reported bank by the torso family
 alone (the reverse of leave_one_out_data.py).

@@ -1,4 +1,4 @@
-"""Write COHFACE trial copies whose video carries a controlled non-respiratory perturbation (R1-4b).
+"""Write COHFACE trial copies whose video carries a controlled non-respiratory perturbation.
 
 The perturbation moves or relights the whole frame, as a shaking camera or flickering light would; it does
 not move the subject against a still background, so it stands in for non-respiratory motion in general,

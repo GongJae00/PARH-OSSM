@@ -1,6 +1,6 @@
-"""R1-2b: copy session pickles with some observations of the bank removed.
+"""Copy session pickles with some observations of the bank removed.
 
-Materializing PARH on the copies (leave_one_out.sh) gives PARH with those observations left out of
+Materializing PARH on the copies (estimate/multichannel_fusion.py with the frozen flags) gives PARH with those observations left out of
 the bank and nothing else changed: each removed observation loses its signal row and its per-
 observation OSSM-KF and PARH rows, the rows the materializer reads as that observation's rate track.
 On MAHNOB-HCI only the sessions of the paired analyses are copied: the 37 sessions without P1D keep

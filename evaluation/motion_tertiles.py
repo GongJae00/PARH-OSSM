@@ -1,11 +1,11 @@
-"""R1-4a: respiratory-rate error by the amount of head motion measured in the video.
+"""Respiratory-rate error by the amount of head motion measured in the video.
 
 Motion is measured without the reference by head_motion.py: the face-detection box is tracked four
 times a second, and the trial's motion is the 5-95th percentile range of the box centre (Euclidean
 norm of the two image axes) in percent of the median face height. The mean speed of the 1-s smoothed
 centre is a second measure that checks that the ranking does not depend on this choice. Both were
 fixed, and checked against detection misses, detection jitter, and the frames of the extreme trials,
-before any error was split by them (paper/revision/content_round1.md, R1-4a).
+before any error was split by them.
 
 Trials are split into motion tertiles within each dataset. Per trial, MAE against a reference is the
 mean |estimate - reference| over windows where both exist, with at least 10 such windows, and the

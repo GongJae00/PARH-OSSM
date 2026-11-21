@@ -1,15 +1,17 @@
 """LaTeX bodies of the Supplementary tables built from the stored per-trial records.
 
-Rate terciles (R2-2c), one table per reference definition: per tercile of the trial-mean reference
+Rate terciles, one table per reference definition: per tercile of the trial-mean reference
 rate, the median trial MAE and the mean bias (estimate minus reference) of each method, from
-rate_agreement.py's trial-means CSVs. Motion tertiles (R1-4a): the median trial MAE per tertile of head
-motion under each reference, from motion_tertiles.py's per-trial CSVs. Perturbations (R1-4b): the median trial
-MAE per condition under each reference, from motion_perturbation_summary.py's per-trial CSV. Redundancy (R1-2b): the
+rate_agreement.py's trial-means CSVs. Motion tertiles: the median trial MAE per tertile of head
+motion under each reference, from motion_tertiles.py's per-trial CSVs. Perturbations: the median trial
+MAE per condition under each reference, from motion_perturbation_summary.py's per-trial CSV. Redundancy: the
 waveform similarity and rate agreement of the observation pairs, from channel_redundancy.py, and the change in
 error when part of the bank is left out, scored by reliability_controls_summary.compare. Writing the rows
 from the records keeps the typeset numbers equal to the analysis outputs.
 
-usage: supplementary_tables.py <out dir>
+usage: supplementary_tables.py <records dir> <out dir>
+<records dir> holds the CSVs the evaluation scripts wrote, under the names used below, and the MAHNOB-HCI subject split
+(evaluation/mahnob_subject_split.csv).
 """
 import os
 import sys
@@ -18,16 +20,15 @@ import pandas as pd
 
 from reliability_controls_summary import compare
 
-HERE = os.path.dirname(os.path.abspath(__file__))
 REFERENCES = [("hilbert", "Hilbert"), ("welch", "Welch"), ("count", "Breath count")]
 METHODS = [("direct_p1d_welch", "Direct P1D quadratic"), ("median_fusion", "Median fusion"),
            ("ossm_kf_track", "OSSM-KF"), ("parh_track", "PARH-OSSM"), ("constant", "Constant predictor")]
-# the frozen method: COHFACE on the first-frame observations (A142), MAHNOB-HCI under the onset placement (A137)
+# the frozen method: COHFACE on the first-frame observations, MAHNOB-HCI under the onset placement
 DATASETS = [("COHFACE", "cohface_first_frame"), ("MAHNOB-HCI", "mahnob_frozen_onset")]
 # motion_tertiles.py scores the methods of the window-rate csv, which holds no median fusion
 MOTION_METHODS = [m for m in METHODS if m[0] != "median_fusion"]
 TERCILES = ["low", "middle", "high"]
-out_dir = sys.argv[1]
+records_dir, out_dir = sys.argv[1:3]
 
 
 def number(x, signed=False, digits=2):
@@ -37,7 +38,7 @@ def number(x, signed=False, digits=2):
 for reference, _ in REFERENCES:
     lines = []
     for dataset, prefix in DATASETS:
-        trials = pd.read_csv(os.path.join(HERE, "rate_agreement", f"{prefix}_trial_means.csv"))
+        trials = pd.read_csv(os.path.join(records_dir, "rate_agreement", f"{prefix}_trial_means.csv"))
         trials = trials[trials.reference == reference].copy()
         edges = trials[trials.method == "parh_track"].reference_bpm.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
         trials["tercile"] = pd.cut(trials.reference_bpm, edges, labels=TERCILES, include_lowest=True)
@@ -55,7 +56,7 @@ for reference, _ in REFERENCES:
 
 lines = []
 for dataset, prefix in DATASETS:
-    trials = pd.read_csv(os.path.join(HERE, "rate_agreement", f"{prefix}_head_motion_trials.csv"))
+    trials = pd.read_csv(os.path.join(records_dir, "rate_agreement", f"{prefix}_head_motion_trials.csv"))
     motion = trials.drop_duplicates("trial").groupby("tertile").motion_range.agg(["min", "max"]).reindex(TERCILES)
     ranges = ", ".join(f"{motion.loc[t, 'min']:.1f}--{motion.loc[t, 'max']:.1f}" for t in TERCILES)
     lines.append(f"\\multicolumn{{10}}{{l}}{{\\textit{{{dataset}}}, {trials.trial.nunique()} trials}} \\\\")
@@ -73,14 +74,14 @@ PERTURBATIONS = [("none", "None"),
                  ("rotation:0.25", "Rotation 0.25$^\\circ$"), ("rotation:0.5", "Rotation 0.5$^\\circ$"), ("rotation:1", "Rotation 1$^\\circ$"),
                  ("brightness:0.01", "Brightness 1\\,\\%"), ("brightness:0.02", "Brightness 2\\,\\%"), ("brightness:0.05", "Brightness 5\\,\\%")]
 PERTURBED_METHODS = ["direct P1D", "OSSM-KF", "PARH-OSSM"]
-perturbation = pd.read_csv(os.path.join(HERE, "cohface_perturbation_trial_mae.csv")).groupby(["condition", "reference", "method"]).MAE.median()
+perturbation = pd.read_csv(os.path.join(records_dir, "cohface_perturbation_trial_mae.csv")).groupby(["condition", "reference", "method"]).MAE.median()
 lines = []
 for condition, name in PERTURBATIONS:
     cells = " & ".join(number(perturbation.loc[(condition, r, m)]) for r, _ in REFERENCES for m in PERTURBED_METHODS)
     lines.append(f"{name} & {cells} \\\\")
 with open(os.path.join(out_dir, "S_perturbation.tex"), "w") as f:
     f.write("\n".join(lines) + "\n")
-# Redundancy (R1-2b): per pair of observations, the waveform similarity and the median |rate difference| over windows
+# Redundancy: per pair of observations, the waveform similarity and the median |rate difference| over windows
 # from channel_redundancy.py, summarised per relation as the median similarity over pair-trials and the share of
 # pair-trials whose rates agree within 1 bpm; pairs with a flat observation (MAHNOB-HCI trials without P1D) are left out
 FAMILY = {"of_farneback": "OF", "of_disp_bridge": "OF", "DoF": "DoF", "dof_disp_bridge": "DoF", "profile1D linear": "P1D",
@@ -92,7 +93,7 @@ RELATIONS = [("OF-OF", "Within OF: OF and OF bridge"), ("DoF-DoF", "Within DoF: 
 REDUNDANCY_DATASETS = [("COHFACE", "cohface_first_frame"), ("MAHNOB-HCI", "mahnob_frozen")]
 summaries = []
 for _, prefix in REDUNDANCY_DATASETS:
-    pairs = pd.read_csv(os.path.join(HERE, f"{prefix}_channel_redundancy.csv")).dropna()
+    pairs = pd.read_csv(os.path.join(records_dir, f"{prefix}_channel_redundancy.csv")).dropna()
     quadratic_cubic = (pairs.channel_a == "profile1D quadratic") & (pairs.channel_b == "profile1D cubic")
     pairs["relation"] = ["-".join(sorted((FAMILY[a], FAMILY[b]))) for a, b in zip(pairs.channel_a, pairs.channel_b)]
     pairs.loc[quadratic_cubic, "relation"] = "P1D quadratic-cubic"
@@ -104,10 +105,10 @@ for relation, name in RELATIONS:
     lines.append(f"{name} & {cells} \\\\")
 with open(os.path.join(out_dir, "S_redundancy.tex"), "w") as f:
     f.write("\n".join(lines) + "\n")
-# Family exclusion (R1-2b): PARH-OSSM rerun with part of the bank left out, against the frozen bank, scored as the
+# Family exclusion: PARH-OSSM rerun with part of the bank left out, against the frozen bank, scored as the
 # confirmatory tests score (reliability_controls_summary.compare): per reference, the median over subjects of the
 # per-subject median of (left-out MAE - frozen MAE), positive when the left-out observations lowered the error, and
-# the number of subjects with a positive value. MAHNOB-HCI rows are the test subjects under the primary placement (A137).
+# the number of subjects with a positive value. MAHNOB-HCI rows are the test subjects under the primary placement.
 EXCLUSIONS = [("no_torso", "Torso displacement"), ("no_of", "OF family"), ("no_dof", "DoF family"), ("no_p1d", "P1D family"),
               ("no_bridges", "OF and DoF bridges"), ("no_p1d_cubic", "P1D cubic"), ("no_p1d_consensus", "P1D consensus")]
 EXCLUSION_DATASETS = [("cohface_first_frame_window_rates_three_references.csv", "none", "all",
@@ -116,9 +117,9 @@ EXCLUSION_DATASETS = [("cohface_first_frame_window_rates_three_references.csv", 
                        "mahnob_loo9_{}_onset_window_rates_three_references.csv")]
 gains = []
 for frozen, split_csv, evaluated, variant in EXCLUSION_DATASETS:
-    comparators = [f"{e}={os.path.join(HERE, variant.format(e))}:parh_track_bpm" for e, _ in EXCLUSIONS]
-    split_path = split_csv if split_csv == "none" else os.path.join(HERE, split_csv)
-    gains.append(compare(os.path.join(HERE, frozen), split_path, evaluated, comparators)[3].set_index(["comparator", "reference"]))
+    comparators = [f"{e}={os.path.join(records_dir, variant.format(e))}:parh_track_bpm" for e, _ in EXCLUSIONS]
+    split_path = split_csv if split_csv == "none" else os.path.join(records_dir, split_csv)
+    gains.append(compare(os.path.join(records_dir, frozen), split_path, evaluated, comparators)[3].set_index(["comparator", "reference"]))
 lines = []
 for exclusion, name in EXCLUSIONS:
     cells = " & ".join(f"{number(g.loc[(exclusion, r), 'subject median gain'], True, 3)} ({g.loc[(exclusion, r), 'subjects better'].split('/')[0]})"

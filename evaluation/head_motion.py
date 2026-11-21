@@ -1,4 +1,4 @@
-"""R1-4a: head motion of each trial, measured from the video without the reference.
+"""Head motion of each trial, measured from the video without the reference.
 
 Seated participants move mostly by moving the head and upper body together, and both datasets frame the
 face large and central, so the face-detection box is tracked through the whole video: MediaPipe face
@@ -11,9 +11,9 @@ Euclidean norm, in percent of the median face height; percentiles over detection
 from setting the range. Secondary measure: the mean speed of the centre after a 1-s moving average, in
 percent of the face height per second, with missed detections linearly interpolated. The share of
 samples without a detection is reported beside both, since a face lost during large motion shortens the
-range. Trials are those of the first R1-4a analysis (rate_agreement/<prefix>_motion_trials.csv).
+range. Trials are those of the trial files given (a CSV with a trial column such as cohface_2_0 or mahnob_w2_<session>).
 
-usage: head_motion.py <track dir> <jobs> > head_motion_trials.csv
+usage: head_motion.py <COHFACE folder> <MAHNOB-HCI folder> <track dir> <jobs> <trials csv> [<trials csv> ...] > head_motion_trials.csv
 """
 import csv
 import os
@@ -25,17 +25,14 @@ import mediapipe as mp
 import numpy as np
 import pandas as pd
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-COHFACE = "/mnt/hdd20t/Dataset/rPPG_Dataset/cohface"
-MAHNOB = "/mnt/hdd20t/Dataset/rPPG_Dataset/MAHNOB_HCI"
 SAMPLES_PER_SEC = 4
 
 
-def video_path(trial):
+def video_path(trial, cohface_root, mahnob_root):
     dataset, *parts = trial.split("_")
     if dataset == "cohface":
-        return os.path.join(COHFACE, *parts, "data.cfr.avi")
-    session = os.path.join(MAHNOB, parts[0])
+        return os.path.join(cohface_root, *parts, "data.cfr.avi")
+    session = os.path.join(mahnob_root, parts[0])
     return os.path.join(session, next(f for f in os.listdir(session) if f.endswith(".avi")))  # the loader's choice
 
 
@@ -76,20 +73,19 @@ def head_motion(times, boxes):
     return 100 * np.hypot(*spread) / face_height, 100 * speed / face_height, 1 - found.mean(), face_height
 
 
-def run(trial, track_dir):
-    times, boxes = face_track(video_path(trial))
+def run(trial, track_dir, cohface_root, mahnob_root):
+    times, boxes = face_track(video_path(trial, cohface_root, mahnob_root))
     np.savez(os.path.join(track_dir, f"{trial}.npz"), time_sec=times, centre_x_px=boxes[:, 0], centre_y_px=boxes[:, 1],
              face_height_px=boxes[:, 2])
     return (trial, *head_motion(times, boxes))
 
 
 if __name__ == "__main__":
-    track_dir, jobs = sys.argv[1], int(sys.argv[2])
+    cohface_root, mahnob_root, track_dir, jobs = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
     os.makedirs(track_dir, exist_ok=True)
-    trials = [t for prefix in ("cohface", "mahnob_w2")
-              for t in pd.read_csv(os.path.join(HERE, "rate_agreement", f"{prefix}_motion_trials.csv")).trial.unique()]
+    trials = [t for path in sys.argv[5:] for t in pd.read_csv(path).trial.unique()]
     out = csv.writer(sys.stdout)
     out.writerow(["trial", "range_pct_face", "speed_pct_face_per_sec", "miss_share", "face_height_px"])
     with Pool(jobs) as pool:
-        for row in pool.starmap(run, [(t, track_dir) for t in trials]):
+        for row in pool.starmap(run, [(t, track_dir, cohface_root, mahnob_root) for t in trials]):
             out.writerow([row[0]] + [f"{v:.4f}" for v in row[1:]])
