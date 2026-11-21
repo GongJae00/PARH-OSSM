@@ -7,13 +7,15 @@
 # rows of the waveform table, the frozen run's trial means on all 488 trials and its head-motion tertiles on the test
 # trials (onset placement), the slopes of the trial means by stage and of the observation tracks, and the
 # Supplementary tables. The scripts that read the split from <records dir> get a copy of it there.
-# <base data dir> holds the pickles of observations/extract.py, <final data dir> those of the frozen run of
+# <base data dir> holds the pickles of observations/extract.py (the eight chest observations), <bank data dir> those
+# of the nine observations (estimate/merge_torso_rows.py), and <final data dir> those of the frozen run of
 # estimate/materialize.sh. The rows of Tables 2 and 3 come from evaluation/main_tables.sh mahnob.
 #
 # usage (from the repository root):
-#   evaluation/mahnob_test_scores.sh <records dir> <out dir> <base data dir> <final data dir> <MAHNOB-HCI folder> <jobs>
+#   evaluation/mahnob_test_scores.sh <records dir> <out dir> <base data dir> <bank data dir> <final data dir> \
+#       <MAHNOB-HCI folder> <jobs>
 set -e
-records=$1; out=$2; base=$3; final=$4; mahnob=$5; jobs=$6
+records=$1; out=$2; base=$3; bank=$4; final=$5; mahnob=$6; jobs=$7
 split=evaluation/mahnob_subject_split.csv
 controls=(equal_readout shuffled_readout equal_filter)
 rungs=(plain_multichannel readout observation_law observability)
@@ -52,5 +54,5 @@ python evaluation/motion_tertiles.py MAHNOB-HCI "$records/mahnob_frozen_onset_wi
 for reference in hilbert welch count; do
   python evaluation/stage_slopes.py "$records" $reference mahnob test
 done > "$out/mahnob_test_stage_slopes.txt"
-python evaluation/observation_track_slope.py "$records" "$base" "$final" test "$jobs" > "$out/mahnob_test_observation_track_slope.txt"
+python evaluation/observation_track_slope.py "$records" "$bank" "$final" test "$jobs" > "$out/mahnob_test_observation_track_slope.txt"
 python evaluation/supplementary_tables.py "$records" "$out"
