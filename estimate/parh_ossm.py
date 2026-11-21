@@ -191,7 +191,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
     ENABLE_RESIDUAL: bool = True
     ENABLE_ADAPT_R: bool = True
     ENABLE_DISENTANGLED_Q: bool = True   # v1 default: disentangled
-    ENABLE_COMPAT_COUPLED_Q: bool = False  # ablation: coupled R_t/R_init scaling
     ENABLE_STUDENT_T: bool = True
     ENABLE_FREQ_ADAPT: bool = True
     USE_HELPER_PATH: bool = True
@@ -1063,381 +1062,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
         active[valid] = blend[valid]
         return out, active
 
-    def _rate_source_arbiter_v1_postprocess(
-        self,
-        current_track: np.ndarray,
-        native_track: np.ndarray,
-        state_freq: np.ndarray,
-        output_rate_hz: Optional[np.ndarray],
-        output_rate_confidence: Optional[np.ndarray],
-        posterior: Dict[str, np.ndarray],
-        alpha_used: float,
-        guard_version: str = "v1",
-    ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
-        """GT-free conservative arbitration among available rate sources.
-
-        This is not a supervised selector.  It keeps the current reported track
-        as the anchor and only moves toward posterior/native/state candidates
-        when target-computable confidence, ambiguity, alias, and agreement
-        evidence supports the alternative.
-        """
-        current = np.asarray(current_track, dtype=np.float64).copy()
-        n = current.size
-        empty = {
-            "blend": np.zeros(n, dtype=np.float64),
-            "selected": np.zeros(n, dtype=np.float64),
-            "current_score": np.zeros(n, dtype=np.float64),
-            "posterior_mean_score": np.zeros(n, dtype=np.float64),
-            "posterior_mode_score": np.zeros(n, dtype=np.float64),
-            "native_score": np.zeros(n, dtype=np.float64),
-            "state_score": np.zeros(n, dtype=np.float64),
-            "output_score": np.zeros(n, dtype=np.float64),
-        }
-        if n == 0:
-            return current, empty
-
-        native = self._fit_track_length(np.asarray(native_track, dtype=np.float64), n)
-        state = self._fit_track_length(np.asarray(state_freq, dtype=np.float64), n)
-        state = self._apply_post_smoothing(state, alpha_override=alpha_used)
-        state = np.clip(state, self.params.f_min, self.params.f_max)
-        output = (
-            self._fit_track_length(np.asarray(output_rate_hz, dtype=np.float64), n)
-            if output_rate_hz is not None
-            else current.copy()
-        )
-        output_conf = (
-            self._fit_track_length(np.asarray(output_rate_confidence, dtype=np.float64), n)
-            if output_rate_confidence is not None
-            else np.zeros(n, dtype=np.float64)
-        )
-        output_conf = np.clip(np.nan_to_num(output_conf, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-
-        post_mean = posterior.get("mean_hz")
-        post_mode = posterior.get("mode_hz")
-        post_conf = posterior.get("confidence")
-        if post_mean is None or post_mode is None or post_conf is None:
-            return current, empty
-        post_mean = self._fit_track_length(np.asarray(post_mean, dtype=np.float64), n)
-        post_mode = self._fit_track_length(np.asarray(post_mode, dtype=np.float64), n)
-        post_conf = self._fit_track_length(np.asarray(post_conf, dtype=np.float64), n)
-        entropy = self._fit_track_length(np.asarray(posterior.get("entropy", np.ones(n)), dtype=np.float64), n)
-        top_gap = self._fit_track_length(np.asarray(posterior.get("top_gap", np.zeros(n)), dtype=np.float64), n)
-        macro = self._fit_track_length(np.asarray(posterior.get("macro_support", np.zeros(n)), dtype=np.float64), n)
-        direct_macro = self._fit_track_length(
-            np.asarray(posterior.get("direct_macro_support", macro), dtype=np.float64), n
-        )
-        motion_direct = self._fit_track_length(
-            np.asarray(posterior.get("motion_direct_support", np.zeros(n)), dtype=np.float64), n
-        )
-        alias = self._fit_track_length(np.asarray(posterior.get("alias_risk", np.zeros(n)), dtype=np.float64), n)
-        h1_role = self._fit_track_length(np.asarray(posterior.get("h1_role_support", direct_macro), dtype=np.float64), n)
-        abstain = self._fit_track_length(np.asarray(posterior.get("abstain_pressure", 1.0 - h1_role), dtype=np.float64), n)
-
-        post_conf = np.clip(np.nan_to_num(post_conf, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        entropy = np.clip(np.nan_to_num(entropy, nan=1.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        top_gap = np.clip(np.nan_to_num(top_gap, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        macro = np.clip(np.nan_to_num(macro, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        direct_macro = np.clip(np.nan_to_num(direct_macro, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        motion_direct = np.clip(np.nan_to_num(motion_direct, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        alias = np.clip(np.nan_to_num(alias, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        h1_role = np.clip(np.nan_to_num(h1_role, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-        abstain = np.clip(np.nan_to_num(abstain, nan=1.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-
-        valid_current = np.isfinite(current)
-        for arr in (native, state, output, post_mean, post_mode):
-            arr[~(np.isfinite(arr) & (arr >= self.params.f_min) & (arr <= self.params.f_max))] = np.nan
-
-        agreement_ref = 0.075
-        posterior_specificity = np.clip(
-            post_conf
-            * (0.35 + 0.65 * (1.0 - entropy))
-            * (0.45 + 0.55 * top_gap)
-            * (0.60 + 0.40 * macro)
-            * (0.70 + 0.30 * direct_macro)
-            * (1.0 - 0.55 * alias)
-            * (0.70 + 0.30 * h1_role)
-            * (1.0 - 0.35 * abstain),
-            0.0,
-            1.0,
-        )
-        output_state_agree = np.exp(-0.5 * ((output - state) / agreement_ref) ** 2)
-        output_native_agree = np.exp(-0.5 * ((output - native) / agreement_ref) ** 2)
-        output_posterior_agree = np.exp(-0.5 * ((output - post_mean) / agreement_ref) ** 2)
-        post_state_agree = np.exp(-0.5 * ((post_mean - state) / agreement_ref) ** 2)
-        native_state_agree = np.exp(-0.5 * ((native - state) / agreement_ref) ** 2)
-
-        output_current_agree = np.exp(-0.5 * ((output - current) / agreement_ref) ** 2)
-        native_current_agree = np.exp(-0.5 * ((native - current) / agreement_ref) ** 2)
-        post_current_agree = np.exp(-0.5 * ((post_mean - current) / agreement_ref) ** 2)
-        native_posterior_agree = np.exp(-0.5 * ((native - post_mean) / agreement_ref) ** 2)
-        output_preservation = np.clip(
-            output_conf
-            * (0.55 + 0.45 * np.nan_to_num(output_current_agree, nan=0.0))
-            * (0.65 + 0.35 * (1.0 - np.nan_to_num(output_native_agree, nan=0.0)))
-            * (0.70 + 0.30 * entropy),
-            0.0,
-            1.0,
-        )
-        native_alias_safety = np.clip(
-            0.38 * np.nan_to_num(native_current_agree, nan=0.0)
-            + 0.30 * np.nan_to_num(native_posterior_agree, nan=0.0)
-            + 0.20 * posterior_specificity
-            + 0.12 * motion_direct,
-            0.0,
-            1.0,
-        )
-
-        current_score = np.clip(
-            0.20
-            + 0.42 * output_conf
-            + 0.18 * np.nan_to_num(output_state_agree, nan=0.0)
-            + 0.12 * np.nan_to_num(output_native_agree, nan=0.0)
-            + 0.08 * (1.0 - abstain),
-            0.0,
-            1.0,
-        )
-        posterior_mean_score = np.clip(
-            0.05
-            + 0.70 * posterior_specificity
-            + 0.18 * np.nan_to_num(post_state_agree, nan=0.0)
-            + 0.07 * motion_direct,
-            0.0,
-            1.0,
-        )
-        posterior_mode_score = np.clip(
-            posterior_mean_score
-            * (0.50 + 0.50 * top_gap)
-            * (0.70 + 0.30 * (1.0 - entropy)),
-            0.0,
-            1.0,
-        )
-        native_score = np.clip(
-            0.12
-            + 0.42 * np.nan_to_num(native_state_agree, nan=0.0)
-            + 0.22 * abstain
-            + 0.12 * (1.0 - output_conf)
-            + 0.12 * (1.0 - alias),
-            0.0,
-            1.0,
-        )
-        state_score = np.clip(
-            0.10
-            + 0.36 * np.nan_to_num(native_state_agree, nan=0.0)
-            + 0.26 * abstain
-            + 0.16 * (1.0 - entropy)
-            + 0.12 * h1_role,
-            0.0,
-            1.0,
-        )
-        output_score = np.zeros(n, dtype=np.float64)
-
-        version = str(guard_version).strip().lower()
-        if version == "v2":
-            # Native/state can agree on the same alias.  v2 keeps the final
-            # readout as a stronger anchor unless the alternative has either
-            # posterior specificity or very low current-output confidence.
-            low_output_confidence = output_conf <= 0.18
-            native_guard_multiplier = np.where(
-                low_output_confidence,
-                1.0,
-                0.42 + 0.58 * native_alias_safety,
-            )
-            state_guard_multiplier = np.where(
-                low_output_confidence,
-                1.0,
-                0.50
-                + 0.30 * np.nan_to_num(post_state_agree, nan=0.0)
-                + 0.20 * posterior_specificity,
-            )
-            current_score = np.clip(current_score + 0.24 * output_preservation, 0.0, 1.0)
-            native_score = np.clip(native_score * native_guard_multiplier, 0.0, 1.0)
-            state_score = np.clip(state_score * state_guard_multiplier, 0.0, 1.0)
-            posterior_mean_score = np.clip(
-                posterior_mean_score
-                + 0.08 * np.nan_to_num(post_current_agree, nan=0.0)
-                - 0.08 * alias,
-                0.0,
-                1.0,
-            )
-            posterior_mode_score = np.clip(
-                posterior_mode_score
-                + 0.05 * np.nan_to_num(post_current_agree, nan=0.0)
-                - 0.05 * alias,
-                0.0,
-                1.0,
-            )
-
-        if version == "v3":
-            # v3 is a source-role arbiter, not another generic blend constant.
-            # It treats the target-computable external readout as an explicit
-            # candidate only when its disagreement with the native oscillator is
-            # accompanied by posterior/state support.  This preserves easy
-            # observable trials while allowing hard-regime alias correction.
-            output_native_conflict = np.abs(output - native)
-            hard_conflict = np.clip((output_native_conflict - 0.025) / 0.075, 0.0, 1.0)
-            output_support = np.clip(
-                0.40 * output_conf
-                + 0.24 * np.nan_to_num(output_posterior_agree, nan=0.0)
-                + 0.22 * np.nan_to_num(output_state_agree, nan=0.0)
-                + 0.14 * posterior_specificity,
-                0.0,
-                1.0,
-            )
-            current_score = np.clip(
-                0.18
-                + 0.28 * np.nan_to_num(output_current_agree, nan=0.0)
-                + 0.20 * np.nan_to_num(output_native_agree, nan=0.0)
-                + 0.18 * (1.0 - hard_conflict)
-                + 0.10 * output_conf
-                + 0.06 * (1.0 - posterior_specificity)
-                + 0.08 * (1.0 - abstain)
-                - 0.36 * hard_conflict * output_support
-                - 0.12 * hard_conflict * output_conf,
-                0.0,
-                1.0,
-            )
-            output_score = np.clip(
-                0.08
-                + 0.30 * output_conf
-                + 0.24 * np.nan_to_num(output_posterior_agree, nan=0.0)
-                + 0.24 * np.nan_to_num(output_state_agree, nan=0.0)
-                + 0.36 * hard_conflict
-                + 0.10 * (1.0 - abstain),
-                0.0,
-                1.0,
-            )
-            posterior_mean_score = np.clip(
-                posterior_mean_score
-                + 0.16 * np.nan_to_num(output_posterior_agree, nan=0.0)
-                + 0.10 * hard_conflict
-                + 0.06 * output_conf,
-                0.0,
-                1.0,
-            )
-            posterior_mode_score = np.clip(
-                posterior_mode_score
-                + 0.10 * np.nan_to_num(output_posterior_agree, nan=0.0)
-                + 0.06 * hard_conflict,
-                0.0,
-                1.0,
-            )
-            native_score = np.clip(
-                native_score * (1.0 - 0.72 * hard_conflict * (0.35 + 0.65 * output_support)),
-                0.0,
-                1.0,
-            )
-            state_score = np.clip(
-                state_score
-                * (
-                    0.55
-                    + 0.25 * np.nan_to_num(output_state_agree, nan=0.0)
-                    + 0.20 * posterior_specificity
-                ),
-                0.0,
-                1.0,
-            )
-
-        candidates = np.vstack([current, post_mean, post_mode, native, state])
-        scores = np.vstack([current_score, posterior_mean_score, posterior_mode_score, native_score, state_score])
-        if version == "v3":
-            candidates = np.vstack([candidates, output])
-            scores = np.vstack([scores, output_score])
-        finite_candidates = np.isfinite(candidates) & (candidates >= self.params.f_min) & (candidates <= self.params.f_max)
-        scores = np.where(finite_candidates, scores, -np.inf)
-        scores[0, valid_current] = np.maximum(scores[0, valid_current], 0.0)
-        best_idx = np.argmax(scores, axis=0)
-        best_score = np.max(scores, axis=0)
-        best_value = candidates[best_idx, np.arange(n)]
-        score_margin = best_score - current_score
-        delta = np.abs(best_value - current)
-        switch_margin = np.full(n, 0.15, dtype=np.float64)
-        if version == "v3":
-            switch_margin = np.where(best_idx == 5, 0.02, 0.12)
-        switch = (
-            valid_current
-            & np.isfinite(best_value)
-            & (best_idx > 0)
-            & (score_margin >= switch_margin)
-            & (delta >= 0.018)
-        )
-        if version == "v2":
-            source_safety = np.ones(n, dtype=bool)
-            native_or_state = (best_idx == 3) | (best_idx == 4)
-            source_safety[native_or_state] = (
-                (output_conf[native_or_state] <= 0.18)
-                | (delta[native_or_state] <= 0.040)
-                | (posterior_specificity[native_or_state] >= 0.36)
-                | (
-                    (native_alias_safety[native_or_state] >= 0.62)
-                    & (np.nan_to_num(output_preservation[native_or_state], nan=0.0) <= 0.28)
-                )
-            )
-            switch &= source_safety
-        if version == "v3":
-            output_native_conflict = np.abs(output - native)
-            hard_conflict = np.clip((output_native_conflict - 0.025) / 0.075, 0.0, 1.0)
-            output_supported = (
-                (output_conf >= 0.08)
-                & (hard_conflict >= 0.16)
-                & (
-                    (np.nan_to_num(output_posterior_agree, nan=0.0) >= 0.50)
-                    | (np.nan_to_num(output_state_agree, nan=0.0) >= 0.50)
-                    | (posterior_specificity >= 0.20)
-                )
-            )
-            posterior_supported = (
-                (posterior_specificity >= 0.22)
-                | (
-                    (hard_conflict >= 0.35)
-                    & (np.nan_to_num(output_posterior_agree, nan=0.0) >= 0.45)
-                )
-            )
-            native_state_supported = (
-                (output_conf <= 0.18)
-                | (delta <= 0.040)
-                | (posterior_specificity >= 0.38)
-                | (hard_conflict <= 0.18)
-            )
-            source_safety = np.ones(n, dtype=bool)
-            source_safety[best_idx == 5] = output_supported[best_idx == 5]
-            source_safety[(best_idx == 1) | (best_idx == 2)] = posterior_supported[(best_idx == 1) | (best_idx == 2)]
-            source_safety[(best_idx == 3) | (best_idx == 4)] = native_state_supported[(best_idx == 3) | (best_idx == 4)]
-            switch &= source_safety
-        blend = np.zeros(n, dtype=np.float64)
-        if version == "v3":
-            output_native_conflict = np.abs(output - native)
-            hard_conflict = np.clip((output_native_conflict - 0.025) / 0.075, 0.0, 1.0)
-            blend_raw = 0.14 + 0.58 * score_margin + 0.20 * hard_conflict
-            output_blend_raw = 0.25 + 0.40 * score_margin + 1.05 * hard_conflict
-            blend_raw = np.where(
-                best_idx == 5,
-                output_blend_raw * (0.85 + 0.15 * output_conf),
-                blend_raw,
-            )
-            output_cap = np.where(hard_conflict >= 0.18, 0.88, 0.38)
-            blend_cap = np.where(best_idx == 5, output_cap, 0.58)
-            blend_cap = np.where((best_idx == 3) | (best_idx == 4), 0.42, blend_cap)
-            blend[switch] = np.minimum(np.clip(blend_raw[switch], 0.0, 0.86), blend_cap[switch])
-        else:
-            blend[switch] = np.clip(0.18 + 0.55 * score_margin[switch], 0.0, 0.52)
-        out = current.copy()
-        out[switch] = (1.0 - blend[switch]) * current[switch] + blend[switch] * best_value[switch]
-        out = np.clip(out, self.params.f_min, self.params.f_max)
-        diag = {
-            "blend": blend,
-            "selected": best_idx.astype(np.float64),
-            "current_score": current_score,
-            "posterior_mean_score": posterior_mean_score,
-            "posterior_mode_score": posterior_mode_score,
-            "native_score": native_score,
-            "state_score": state_score,
-            "output_score": output_score,
-            "output_preservation": output_preservation,
-            "native_alias_safety": native_alias_safety,
-            "posterior_specificity": posterior_specificity,
-        }
-        return out, diag
-
     def _coerce_rate_posterior_runtime(self, raw: object, n: int) -> Dict[str, np.ndarray]:
         """Parse candidate-rate posterior arrays from materialization metadata."""
         if not isinstance(raw, dict) or int(n) <= 0:
@@ -2180,30 +1804,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
             Q[7, 7] = self.Q_RESIDUAL_VEL * qx * aper_scale
 
         return np.nan_to_num(Q, nan=0.0, posinf=0.0, neginf=0.0)
-
-    def _build_Q_compat_coupled(
-        self, qx: float, dt: float, r_ratio: float,
-    ) -> np.ndarray:
-        """Compatibility coupled Q: all components scale with R_t/R_init ratio.
-        Kept for ablation comparison only.
-        """
-        q_dyn_scale = 1.0 + self.QX_ADAPT_GAMMA_COMPAT * max(r_ratio - 1.0, 0.0)
-        q_res_scale = max(1.0, 2.0 - q_dyn_scale)
-
-        Q = np.zeros((8, 8), dtype=np.float64)
-        q_h1 = qx * self.Q_HARMONIC1_SCALE * q_dyn_scale
-        Q[0, 0] = q_h1;  Q[1, 1] = q_h1
-        if self.ENABLE_HARMONIC2:
-            q_h2 = qx * self.Q_HARMONIC2_SCALE * q_dyn_scale
-            Q[2, 2] = q_h2;  Q[3, 3] = q_h2
-        if self.ENABLE_BASELINE:
-            dt_scale = dt / (1.0 / self._REF_FPS)
-            Q[4, 4] = self.Q_BASELINE_POS * dt_scale
-            Q[5, 5] = self.Q_BASELINE_VEL * dt_scale
-        if self.ENABLE_RESIDUAL:
-            Q[6, 6] = self.Q_RESIDUAL_POS * qx * q_res_scale
-            Q[7, 7] = self.Q_RESIDUAL_VEL * qx * q_res_scale
-        return Q
 
     def _build_H(self) -> np.ndarray:
         """1x8 default observation matrix: y = h_c1 + h_c2 + b + r."""
@@ -3257,10 +2857,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
                 bool(self.ENABLE_TARGET_OBSERVABILITY_CONTROL),
             )
         )
-        enable_rate_source_arbiter_v1 = bool(run_meta.pop("enable_rate_source_arbiter_v1_runtime", False))
-        enable_rate_source_arbiter_v2 = bool(run_meta.pop("enable_rate_source_arbiter_v2_runtime", False))
-        enable_rate_source_arbiter_v3 = bool(run_meta.pop("enable_rate_source_arbiter_v3_runtime", False))
-        rate_source_arbiter_version = "v3" if enable_rate_source_arbiter_v3 else ("v2" if enable_rate_source_arbiter_v2 else "v1")
         self._current_run_meta = dict(run_meta)
         base_method = self._base_method_from_meta(self._current_run_meta)
         signal_arr = np.asarray(signal, dtype=np.float64)
@@ -4455,9 +4051,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
                         obs_nonosc_need=obs_nonosc_need_eff,
                         residual_prior_scale=residual_prior_eff_t,
                     )
-                elif self.ENABLE_COMPAT_COUPLED_Q:
-                    r_ratio = float(np.mean(R_t)) / max(R_init, 1e-12) if multichannel else (R_t / max(R_init, 1e-12))
-                    Q = self._build_Q_compat_coupled(qx, dt, r_ratio)
                 # else: keep default Q (no adaptation)
 
                 # Re-predict with updated Q
@@ -4891,18 +4484,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
             "native_alias_safety": np.zeros(n, dtype=np.float64),
             "posterior_specificity": np.zeros(n, dtype=np.float64),
         }
-        if (enable_rate_source_arbiter_v1 or enable_rate_source_arbiter_v2 or enable_rate_source_arbiter_v3) and external_rate_posterior:
-            track_hz_smoothed, diag_rate_source_arbiter = self._rate_source_arbiter_v1_postprocess(
-                track_hz_smoothed,
-                track_hz_native_smoothed,
-                diag_freq,
-                external_output_rate,
-                external_output_rate_confidence,
-                external_rate_posterior,
-                alpha_used,
-                guard_version=rate_source_arbiter_version,
-            )
-            diag_output_rate_blend = np.maximum(diag_output_rate_blend, diag_rate_source_arbiter["blend"])
 
         # Primary output: smoothed z_osc for rate estimation
         signal_hat = z_osc_smoothed
@@ -4915,7 +4496,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
         active_modules = []
         if self.ENABLE_ADAPT_R: active_modules.append("adapt_R")
         if self.ENABLE_DISENTANGLED_Q: active_modules.append("disentangled_Q")
-        if self.ENABLE_COMPAT_COUPLED_Q: active_modules.append("compat_coupled_Q")
         if self.ENABLE_STUDENT_T: active_modules.append("student_t")
         if self.ENABLE_FREQ_ADAPT: active_modules.append("freq_adapt")
         if freq_rescue_allowed:
@@ -4966,8 +4546,6 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
         if external_rate_posterior_present:
             active_modules.append("candidate_rate_posterior")
         rate_source_arbiter_applied = bool(np.any(diag_rate_source_arbiter["blend"] > 0.0))
-        if enable_rate_source_arbiter_v1 or enable_rate_source_arbiter_v2 or enable_rate_source_arbiter_v3:
-            active_modules.append("diagnostic_rate_source_arbiter")
 
         meta_payload = dict(run_meta)
         meta_payload["f0"] = freq0
@@ -4996,14 +4574,8 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
             "nuisance_r_scale": float(self.TARGET_OBS_NUISANCE_R_SCALE),
             "role_power": float(self.TARGET_OBS_ROLE_POWER),
         }
-        meta_payload["rate_source_arbiter_enabled"] = bool(
-            enable_rate_source_arbiter_v1 or enable_rate_source_arbiter_v2 or enable_rate_source_arbiter_v3
-        )
-        meta_payload["rate_source_arbiter_mode"] = (
-            "diagnostic_compatibility"
-            if (enable_rate_source_arbiter_v1 or enable_rate_source_arbiter_v2 or enable_rate_source_arbiter_v3)
-            else "off"
-        )
+        meta_payload["rate_source_arbiter_enabled"] = False
+        meta_payload["rate_source_arbiter_mode"] = "off"
         meta_payload["rate_source_arbiter_applied"] = bool(rate_source_arbiter_applied)
         meta_payload["rate_source_arbiter_blend_active_frac"] = float(
             np.mean(diag_rate_source_arbiter["blend"] > 0.0)
@@ -5350,14 +4922,8 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
             "target_source_spread_hz_median": float(np.median(diag_target_source_spread_hz)),
             "target_posterior_specificity_median": float(np.median(diag_target_posterior_specificity)),
             "target_alias_safety_median": float(np.median(diag_target_alias_safety)),
-            "rate_source_arbiter_enabled": bool(
-                enable_rate_source_arbiter_v1 or enable_rate_source_arbiter_v2 or enable_rate_source_arbiter_v3
-            ),
-            "rate_source_arbiter_mode": (
-                "diagnostic_compatibility"
-                if (enable_rate_source_arbiter_v1 or enable_rate_source_arbiter_v2 or enable_rate_source_arbiter_v3)
-                else "off"
-            ),
+            "rate_source_arbiter_enabled": False,
+            "rate_source_arbiter_mode": "off",
             "rate_source_arbiter_blend_active_frac": float(np.mean(diag_rate_source_arbiter["blend"] > 0.0)),
             "rate_source_arbiter_blend_mean": (
                 float(np.mean(diag_rate_source_arbiter["blend"][diag_rate_source_arbiter["blend"] > 0.0]))

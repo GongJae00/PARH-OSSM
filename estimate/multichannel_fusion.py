@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import os
 import pickle
@@ -104,18 +103,6 @@ DERIVED_PARENT_GROUPS = {
     "G_DoF_bridge": "G_DoF",
 }
 RELEASE_RATE_POSTERIOR_OUTPUTS = {"final", "calibrated_mean"}
-DIAGNOSTIC_RATE_POSTERIOR_OUTPUTS = {
-    "mode",
-    "mean",
-    "specific_calibrated_mean",
-    "macroguard_specific_calibrated_mean",
-    "roleaware_macroguard_specific_calibrated_mean",
-    "source_validity",
-    "source_validity_guarded",
-    "source_arbiter_v1",
-    "source_arbiter_v2",
-    "source_arbiter_v3",
-}
 
 
 def _normalize_rate_posterior_output_source(source: str) -> str:
@@ -138,8 +125,6 @@ def _rate_posterior_output_role(source: str) -> str:
         return "native_state_update_only"
     if source in RELEASE_RATE_POSTERIOR_OUTPUTS:
         return "release_bounded_readout"
-    if source in DIAGNOSTIC_RATE_POSTERIOR_OUTPUTS:
-        return "diagnostic_or_compatibility"
     return "unknown"
 
 
@@ -313,15 +298,6 @@ def parse_args() -> argparse.Namespace:
         dest="enable_rate_hypothesis_graph",
         action="store_true",
         help=argparse.SUPPRESS,
-    )
-    p.add_argument(
-        "--enable-derived-consistency-scaling",
-        action="store_true",
-        help=(
-            "Diagnostic only: downweight derived bridge observations when they "
-            "disagree with parent/peer groups. Off by default because the "
-            "2026-05-02 MAHNOB smoke regressed median MAE."
-        ),
     )
     p.add_argument(
         "--enable-rate-posterior",
@@ -661,86 +637,6 @@ def _channel_context_prior_runtime(
         row[~np.isfinite(row)] = fallback
         mat[idx] = row
     return mat.tolist()
-
-
-def _state_role_prior_runtime(
-    names: Sequence[str],
-    window_rows: Sequence[Dict[str, float]],
-    n_frames: int,
-    fps: float,
-) -> Dict[str, List[List[float]]]:
-    """Build per-channel, per-time state-role reliability matrices.
-
-    Unlike the older channel context prior, these matrices keep the reliability
-    of the fundamental oscillator, harmonic scaffold, baseline, and residual as
-    separate signals. PARH can then combine them using the actual observation
-    row `H` instead of collapsing a family into one scalar winner.
-    """
-    role_cols = {
-        "h1": "h1_timing_weight",
-        "h2": "h2_harmonic_weight",
-        "b": "b_baseline_weight",
-        "r": "r_residual_weight",
-        "abstain": "component_abstain_score",
-        "z_osc": "z_osc_readout_weight",
-        "z_full": "z_full_readout_weight",
-    }
-    n_channels = len(names)
-    n = int(n_frames)
-    if n_channels <= 0 or n <= 0 or not window_rows:
-        return {}
-    groups = [FAMILY_GROUPS.get(str(name), str(name)) for name in names]
-    accum = {
-        role: np.full((n_channels, n), np.nan, dtype=np.float64)
-        for role in role_cols
-    }
-    counts = {
-        role: np.zeros((n_channels, n), dtype=np.float64)
-        for role in role_cols
-    }
-    sums = {
-        role: np.zeros((n_channels, n), dtype=np.float64)
-        for role in role_cols
-    }
-    for row in window_rows:
-        group = str(row.get("group", ""))
-        try:
-            start = int(max(0, round(float(row.get("start_sec", 0.0)) * float(fps))))
-            end = int(min(n, round(float(row.get("end_sec", 0.0)) * float(fps))))
-        except Exception:
-            continue
-        if end <= start:
-            continue
-        idxs = [idx for idx, channel_group in enumerate(groups) if channel_group == group]
-        if not idxs:
-            continue
-        for role, col in role_cols.items():
-            try:
-                value = float(row.get(col, np.nan))
-            except Exception:
-                value = float("nan")
-            if not np.isfinite(value):
-                continue
-            value = float(np.clip(value, 0.0, 1.0))
-            for idx in idxs:
-                sums[role][idx, start:end] += value
-                counts[role][idx, start:end] += 1.0
-    out: Dict[str, List[List[float]]] = {}
-    for role in role_cols:
-        mat = accum[role]
-        valid = counts[role] > 0.0
-        mat[valid] = sums[role][valid] / counts[role][valid]
-        if not np.any(np.isfinite(mat)):
-            continue
-        default = 0.0 if role == "abstain" else 1.0
-        row_fill = np.nanmedian(mat, axis=1)
-        row_fill = np.where(np.isfinite(row_fill), row_fill, default)
-        bad = ~np.isfinite(mat)
-        if np.any(bad):
-            rows, _cols = np.where(bad)
-            mat[bad] = row_fill[rows]
-        out[role] = np.clip(mat, 0.0, 1.0).tolist()
-    return out
 
 
 def _weighted_median(values: np.ndarray, weights: np.ndarray, *, fallback: float = np.nan) -> float:
@@ -1098,369 +994,6 @@ def _preserve_trustworthy_track_rate(
         blended = 0.65 * track + 0.35 * float(anchored_rate)
         return float(np.clip(blended, float(min_hz), float(max_hz))), "stable_track_blend"
     return float(anchored_rate), "harmonic_anchor"
-
-
-def _derived_consistency_score_scale(
-    group: str,
-    group_rates: Dict[str, float],
-    group_scores: Dict[str, float],
-    *,
-    rate_ref: float,
-) -> Tuple[float, str]:
-    """Discount derived bridge observations when their source family disagrees.
-
-    OF_bridge and DoF_bridge are useful only as parent-compatible observation
-    enrichments. They are not independent sensors. A bridge may still dominate
-    when other families support its timing, but an isolated bridge should not
-    override its parent raw family.
-    """
-    parent = DERIVED_PARENT_GROUPS.get(str(group))
-    if not parent or group not in group_rates:
-        return 1.0, "native_or_untracked"
-    child_rate = float(group_rates[group])
-    if not np.isfinite(child_rate):
-        return 0.35, "derived_invalid"
-
-    support_num = 0.0
-    support_den = 0.0
-    parent_support = float("nan")
-    for peer, rate in group_rates.items():
-        if peer == group:
-            continue
-        weight = float(group_scores.get(peer, 0.0))
-        if not (np.isfinite(rate) and np.isfinite(weight) and weight > 0.0):
-            continue
-        support = float(np.exp(-0.5 * ((child_rate - float(rate)) / max(float(rate_ref), 1e-6)) ** 2))
-        support_num += weight * support
-        support_den += weight
-        if peer == parent:
-            parent_support = support
-
-    peer_support = support_num / support_den if support_den > 1e-12 else 0.0
-    if not np.isfinite(parent_support):
-        parent_support = peer_support
-
-    if parent_support >= 0.50 or peer_support >= 0.45:
-        return 1.0, "derived_supported"
-    if parent_support >= 0.30 or peer_support >= 0.30:
-        return 0.65, "derived_weakly_supported"
-    return 0.35, "derived_isolated"
-
-
-def _apply_derived_consistency_scaling(
-    group_rates: Dict[str, float],
-    group_scores: Dict[str, float],
-    *,
-    rate_ref: float,
-) -> Dict[str, int]:
-    counts: Dict[str, int] = {}
-    for group in list(group_rates):
-        scale, mode = _derived_consistency_score_scale(
-            group,
-            group_rates,
-            group_scores,
-            rate_ref=rate_ref,
-        )
-        if scale < 1.0 and group in group_scores:
-            group_scores[group] = float(group_scores[group]) * float(scale)
-        counts[mode] = int(counts.get(mode, 0)) + 1
-    return counts
-
-
-def _source_validity_peer_support(
-    group: str,
-    group_rate: float,
-    group_rates: Dict[str, float],
-    group_scores: Dict[str, float],
-    *,
-    rate_ref: float,
-) -> float:
-    if not np.isfinite(group_rate):
-        return 0.0
-    own_macro = _macro_timing_family(group)
-    num = 0.0
-    den = 0.0
-    for peer, rate in group_rates.items():
-        if peer == group or _macro_timing_family(peer) == own_macro:
-            continue
-        weight = float(group_scores.get(peer, 0.0))
-        if not (np.isfinite(rate) and np.isfinite(weight) and weight > 0.0):
-            continue
-        support = _direct_candidate_support(float(group_rate), float(rate), float(rate_ref))
-        num += weight * support
-        den += weight
-    return float(np.clip(num / den, 0.0, 1.0)) if den > 1e-12 else 0.0
-
-
-def _source_validity_rate_readout_runtime(
-    names: Sequence[str],
-    signals: Sequence[np.ndarray],
-    rate_tracks: Sequence[np.ndarray],
-    window_rows: Sequence[Dict[str, float]],
-    n_frames: int,
-    fps: float,
-    fallback_priors: Dict[str, float],
-    min_hz: float,
-    max_hz: float,
-) -> Tuple[Optional[List[float]], Optional[List[float]], Dict[str, object]]:
-    """GT-free source-validity posterior over observation groups.
-
-    This is intentionally not a hard selector. It asks which observation
-    source is locally valid, then reports a conservative source-posterior
-    readout. The posterior uses only target-computable features already
-    exported by the reliability graph plus intra-window source agreement.
-    """
-    n = int(max(n_frames, 0))
-    if n <= 0 or fps <= 0.0 or not names or not window_rows:
-        return None, None, {"enabled": False, "reason": "missing_inputs"}
-
-    sig_rows = [_fit_length(np.asarray(sig, dtype=np.float64), n, fill_value=0.0) for sig in signals]
-    rate_rows = []
-    for track in rate_tracks:
-        arr = _fit_length(np.asarray(track, dtype=np.float64), n)
-        arr = np.where(
-            np.isfinite(arr) & (arr >= float(min_hz)) & (arr <= float(max_hz)),
-            arr,
-            np.nan,
-        )
-        rate_rows.append(arr)
-    if not sig_rows or not rate_rows:
-        return None, None, {"enabled": False, "reason": "empty_inputs"}
-    signal_mat = np.vstack(sig_rows)
-    rate_mat = np.vstack(rate_rows)
-
-    groups: Dict[str, List[int]] = {}
-    for idx, name in enumerate(names):
-        groups.setdefault(FAMILY_GROUPS.get(str(name), str(name)), []).append(idx)
-
-    by_window: Dict[Tuple[int, int], List[Dict[str, float]]] = {}
-    for row in window_rows:
-        try:
-            start = int(max(0, round(float(row.get("start_sec", 0.0)) * float(fps))))
-            end = int(min(n, round(float(row.get("end_sec", 0.0)) * float(fps))))
-        except Exception:
-            continue
-        if end <= start:
-            continue
-        by_window.setdefault((start, end), []).append(row)
-    if not by_window:
-        return None, None, {"enabled": False, "reason": "no_valid_windows"}
-
-    readout_sum = np.zeros(n, dtype=np.float64)
-    conf_sum = np.zeros(n, dtype=np.float64)
-    conf_count = np.zeros(n, dtype=np.float64)
-    rate_ref = max(0.03, 0.10 * (float(max_hz) - float(min_hz)))
-    accepted = 0
-    confidence_values: List[float] = []
-    entropy_values: List[float] = []
-    top_gap_values: List[float] = []
-    mode_values: List[float] = []
-    selected_counts: Dict[str, int] = {}
-    group_rate_mode_counts: Dict[str, int] = {}
-
-    for (start, end), rows in sorted(by_window.items()):
-        row_by_group = {str(row.get("group", "")).strip(): row for row in rows}
-        group_rates: Dict[str, float] = {}
-        base_scores: Dict[str, float] = {}
-        row_cache: Dict[str, Dict[str, float]] = {}
-        track_present: Dict[str, float] = {}
-
-        for group, idxs in groups.items():
-            row = row_by_group.get(group)
-            if row is None:
-                continue
-            idx_arr = np.asarray(idxs, dtype=int)
-            valid_rates = rate_mat[idx_arr, start:end].reshape(-1)
-            valid_rates = valid_rates[
-                np.isfinite(valid_rates)
-                & (valid_rates >= float(min_hz))
-                & (valid_rates <= float(max_hz))
-            ]
-            local_rates: List[float] = []
-            local_weights: List[float] = []
-            track_rate = float("nan")
-            stability = 0.0
-            if valid_rates.size >= max(3, int(0.08 * max(1, end - start))):
-                track_rate = float(np.median(valid_rates))
-                std = float(np.std(valid_rates))
-                stability = float(np.exp(-0.5 * (std / rate_ref) ** 2))
-                local_rates.append(track_rate)
-                local_weights.append(max(stability, 0.05))
-
-            sig_window = np.nanmedian(signal_mat[idx_arr, start:end], axis=0)
-            spectral_candidates = _spectral_rate_candidates(
-                sig_window,
-                fps,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                max_candidates=4,
-            )
-            spectral_score = max((float(rel_power) for _, rel_power in spectral_candidates), default=0.0)
-            if not np.isfinite(track_rate):
-                for peak_hz, rel_power in spectral_candidates:
-                    local_rates.append(float(peak_hz))
-                    local_weights.append(float(rel_power))
-            if not local_rates:
-                continue
-            group_rate, internal_support = _harmonic_rate_anchor(
-                np.asarray(local_rates, dtype=np.float64),
-                np.asarray(local_weights, dtype=np.float64),
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
-            if not np.isfinite(group_rate):
-                continue
-            group_rate, group_rate_mode = _preserve_trustworthy_track_rate(
-                group,
-                float(track_rate),
-                float(stability),
-                float(group_rate),
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-            )
-            soft_score = _finite_row_float(row, "score")
-            base = _readout_timing_reliability_from_row(row, fallback=soft_score)
-            if not np.isfinite(base) or base <= 0.0:
-                base = float(fallback_priors.get(group, np.nan))
-            if not np.isfinite(base) or base <= 0.0:
-                base = 0.20
-            support_score = _finite_row_float(row, "group_support_score", base)
-            macro_score = _finite_row_float(row, "macro_timing_support_score", base)
-            event_score = _finite_row_float(row, "event_timing_score", 0.0)
-            rate_phase = _finite_row_float(row, "rate_phase_score", 1.0)
-            harmonic_risk = _finite_row_float(row, "harmonic_risk_score", 0.50)
-            abstain = _finite_row_float(row, "abstain_score", 0.50)
-            timing_specificity = max(float(internal_support), float(stability), float(spectral_score), 0.05)
-            score = (
-                float(np.clip(base, 0.0, 1.0))
-                * float(np.clip(rate_phase, 0.05, 1.0))
-                * float(RATE_TIMING_GROUP_PRIOR.get(group, 0.80))
-                * (0.45 + 0.55 * float(np.clip(support_score, 0.0, 1.0)))
-                * (0.55 + 0.45 * float(np.clip(max(macro_score, event_score), 0.0, 1.0)))
-                * (0.60 + 0.40 * float(np.clip(timing_specificity, 0.0, 1.0)))
-                * (1.0 - 0.22 * float(np.clip(harmonic_risk, 0.0, 1.0)))
-                * (1.0 - 0.18 * float(np.clip(abstain, 0.0, 1.0)))
-            )
-            if np.isfinite(track_rate):
-                score *= 1.05
-            if score <= 0.02:
-                continue
-            group_rates[group] = float(group_rate)
-            base_scores[group] = float(np.clip(score, 0.0, 2.0))
-            row_cache[group] = row
-            track_present[group] = 1.0 if np.isfinite(track_rate) else 0.0
-            group_rate_mode_counts[str(group_rate_mode)] = int(group_rate_mode_counts.get(str(group_rate_mode), 0)) + 1
-
-        if not group_rates:
-            continue
-
-        source_scores: Dict[str, float] = {}
-        for group, rate in group_rates.items():
-            peer_support = _source_validity_peer_support(
-                group,
-                float(rate),
-                group_rates,
-                base_scores,
-                rate_ref=rate_ref,
-            )
-            row = row_cache.get(group, {})
-            macro_score = _finite_row_float(row, "macro_timing_support_score", peer_support)
-            parent_scale, _ = _derived_consistency_score_scale(
-                group,
-                group_rates,
-                base_scores,
-                rate_ref=rate_ref,
-            )
-            source_scores[group] = float(base_scores[group]) * (
-                0.50 + 0.50 * max(peer_support, float(np.clip(macro_score, 0.0, 1.0)))
-            ) * (0.70 + 0.30 * float(parent_scale))
-
-        group_names = list(group_rates)
-        rates = np.asarray([group_rates[g] for g in group_names], dtype=np.float64)
-        scores = np.asarray([max(source_scores[g], 1e-9) for g in group_names], dtype=np.float64)
-        probs = scores ** 1.35
-        probs = probs / max(float(np.sum(probs)), 1e-12)
-        source_median = _weighted_median(rates, probs, fallback=float(np.nanmedian(rates)))
-        source_mean = float(np.sum(probs * rates))
-        order = np.argsort(probs)[::-1]
-        top_idx = int(order[0])
-        top_prob = float(probs[top_idx])
-        second_prob = float(probs[order[1]]) if probs.size > 1 else 0.0
-        top_gap = float(np.clip((top_prob - second_prob) / max(top_prob, 1e-12), 0.0, 1.0))
-        entropy = float(-np.sum(probs * np.log(np.clip(probs, 1e-12, 1.0))))
-        entropy_norm = (
-            float(np.clip(entropy / max(math.log(max(probs.size, 2)), 1e-12), 0.0, 1.0))
-            if probs.size > 1 else 0.0
-        )
-        if not np.isfinite(source_median):
-            continue
-        top_rate = float(rates[top_idx])
-        # Avoid hard mode selection: source validity can sharpen a posterior,
-        # but source topology is still uncertain under target shift.
-        sharpness = float(np.clip((top_prob - 0.35) / 0.45, 0.0, 1.0))
-        readout = float(np.clip(
-            (1.0 - 0.35 * sharpness) * source_median
-            + 0.20 * sharpness * source_mean
-            + 0.15 * sharpness * top_rate,
-            float(min_hz),
-            float(max_hz),
-        ))
-        support = 0.0
-        for prob, rate in zip(probs, rates):
-            support += float(prob) * _direct_candidate_support(readout, float(rate), rate_ref)
-        confidence = float(np.clip(
-            (0.25 + 0.75 * support)
-            * (0.35 + 0.65 * (1.0 - entropy_norm))
-            * (0.45 + 0.55 * top_gap),
-            0.0,
-            1.0,
-        ))
-        if confidence <= 0.02:
-            continue
-        readout_sum[start:end] += confidence * readout
-        conf_sum[start:end] += confidence
-        conf_count[start:end] += 1.0
-        accepted += 1
-        confidence_values.append(confidence)
-        entropy_values.append(entropy_norm)
-        top_gap_values.append(top_gap)
-        mode_values.append(top_rate)
-        selected = str(group_names[top_idx])
-        selected_counts[selected] = int(selected_counts.get(selected, 0)) + 1
-
-    valid = conf_sum > 1e-12
-    if not np.any(valid):
-        return None, None, {"enabled": False, "reason": "no_supported_source_validity_windows"}
-    readout_track = np.full(n, np.nan, dtype=np.float64)
-    confidence_track = np.zeros(n, dtype=np.float64)
-    readout_track[valid] = readout_sum[valid] / conf_sum[valid]
-    confidence_track[valid] = np.clip(conf_sum[valid] / np.maximum(conf_count[valid], 1.0), 0.0, 1.0)
-    fill_fraction = 0.0
-    coverage = float(np.mean(valid))
-    if 0.25 <= coverage < 1.0 and np.count_nonzero(valid) >= 2:
-        idx = np.arange(n, dtype=np.float64)
-        valid_idx = idx[valid]
-        fill_mask = ~valid
-        filled_rate = np.interp(idx, valid_idx, readout_track[valid])
-        filled_conf = np.interp(idx, valid_idx, confidence_track[valid])
-        readout_track[fill_mask] = filled_rate[fill_mask]
-        confidence_track[fill_mask] = 0.50 * filled_conf[fill_mask]
-        fill_fraction = float(np.mean(fill_mask))
-    meta: Dict[str, object] = {
-        "enabled": True,
-        "source": "source_validity_posterior",
-        "coverage": coverage,
-        "persistence_fill_fraction": fill_fraction,
-        "accepted_windows": int(accepted),
-        "confidence_mean": float(np.mean(confidence_track[valid])),
-        "source_validity_entropy_median": float(np.median(entropy_values)) if entropy_values else float("nan"),
-        "source_validity_top_gap_median": float(np.median(top_gap_values)) if top_gap_values else float("nan"),
-        "source_validity_mode_hz_median": float(np.median(mode_values)) if mode_values else float("nan"),
-        "selected_group_counts": dict(selected_counts),
-        "group_rate_mode_counts": dict(group_rate_mode_counts),
-    }
-    return readout_track.tolist(), confidence_track.tolist(), meta
 
 
 def _rate_hypothesis_graph_anchor(
@@ -2322,10 +1855,6 @@ RATE_TIMING_GROUP_PRIOR = {
 REGIME_CHANNEL_FLOOR = 0.06
 
 
-def _clip01(x: float) -> float:
-    return float(np.clip(float(x), 0.0, 1.0)) if np.isfinite(x) else 0.0
-
-
 def _semantic_group_support(groups: Dict[str, float], names: Sequence[str]) -> np.ndarray:
     vals = []
     for name in names:
@@ -2678,7 +2207,6 @@ def _decoupled_rate_readout_runtime(
     min_hz: float,
     max_hz: float,
     enable_rate_hypothesis_graph_v4: bool = False,
-    enable_derived_consistency_scaling: bool = False,
 ) -> Tuple[Optional[List[float]], Optional[List[float]], Dict[str, object]]:
     """GT-free output-rate readout for z_osc.
 
@@ -2734,7 +2262,6 @@ def _decoupled_rate_readout_runtime(
     mode_counts: Dict[str, int] = {}
     selected_counts: Dict[str, int] = {}
     group_rate_mode_counts: Dict[str, int] = {}
-    derived_consistency_counts: Dict[str, int] = {}
     confidence_values: List[float] = []
     rate_values: List[float] = []
     support_counts: List[int] = []
@@ -2836,13 +2363,6 @@ def _decoupled_rate_readout_runtime(
 
         if not group_rates:
             continue
-        if enable_derived_consistency_scaling:
-            for mode, count in _apply_derived_consistency_scaling(
-                group_rates,
-                group_scores,
-                rate_ref=rate_ref,
-            ).items():
-                derived_consistency_counts[mode] = int(derived_consistency_counts.get(mode, 0)) + int(count)
         group_names = list(group_rates)
         rate_arr = np.asarray([group_rates[g] for g in group_names], dtype=np.float64)
         weight_arr = np.asarray([max(group_scores[g], 1e-6) for g in group_names], dtype=np.float64)
@@ -2997,7 +2517,7 @@ def _decoupled_rate_readout_runtime(
         "mode_counts": dict(mode_counts),
         "selected_group_counts": dict(selected_counts),
         "group_rate_mode_counts": dict(group_rate_mode_counts),
-        "derived_consistency_counts": dict(derived_consistency_counts),
+        "derived_consistency_counts": {},
     }
     return readout_track.tolist(), confidence_track.tolist(), meta
 
@@ -3012,7 +2532,6 @@ def _candidate_rate_posterior_runtime(
     fallback_priors: Dict[str, float],
     min_hz: float,
     max_hz: float,
-    enable_derived_consistency_scaling: bool = False,
     enable_signal_sqi_observability: bool = False,
 ) -> Tuple[Optional[Dict[str, List[float]]], Dict[str, object]]:
     """Build a GT-free candidate-frequency posterior for the h1 oscillator.
@@ -3103,7 +2622,6 @@ def _candidate_rate_posterior_runtime(
     phase_coherence_values: List[float] = []
     mode_counts: Dict[str, int] = {}
     group_rate_mode_counts: Dict[str, int] = {}
-    derived_consistency_counts: Dict[str, int] = {}
 
     for (start, end), rows in sorted(by_window.items()):
         row_by_group = {str(row.get("group", "")).strip(): row for row in rows}
@@ -3209,13 +2727,6 @@ def _candidate_rate_posterior_runtime(
 
         if not group_rates:
             continue
-        if enable_derived_consistency_scaling:
-            for mode, count in _apply_derived_consistency_scaling(
-                group_rates,
-                group_scores,
-                rate_ref=rate_ref,
-            ).items():
-                derived_consistency_counts[mode] = int(derived_consistency_counts.get(mode, 0)) + int(count)
 
         group_names = list(group_rates)
         rate_arr = np.asarray([group_rates[g] for g in group_names], dtype=np.float64)
@@ -3492,7 +3003,7 @@ def _candidate_rate_posterior_runtime(
         ),
         "mode_counts": dict(mode_counts),
         "group_rate_mode_counts": dict(group_rate_mode_counts),
-        "derived_consistency_counts": dict(derived_consistency_counts),
+        "derived_consistency_counts": {},
     }
     return runtime, meta
 
@@ -3744,9 +3255,6 @@ def _calibrated_posterior_mean_readout(
     *,
     min_hz: float,
     max_hz: float,
-    enable_specificity_boost: bool = False,
-    enable_macro_guard: bool = False,
-    enable_role_guard: bool = False,
 ) -> Tuple[Optional[List[float]], Optional[List[float]], Dict[str, object]]:
     """Use posterior mean as a bounded correction to the existing z_osc readout."""
     if not posterior_runtime:
@@ -3834,79 +3342,33 @@ def _calibrated_posterior_mean_readout(
     if not np.any(valid):
         return None, None, {"enabled": False, "reason": "no_valid_overlap"}
 
-    if bool(enable_macro_guard):
-        certainty = np.clip(
-            0.20
-            + 0.25 * post_conf
-            + 0.20 * (1.0 - entropy)
-            + 0.20 * top_gap
-            + 0.05 * macro
-            + 0.05 * direct_macro
-            + 0.05 * h1_role,
-            0.0,
-            1.0,
-        )
-    else:
-        certainty = np.clip(
-            0.20
-            + 0.25 * post_conf
-            + 0.20 * (1.0 - entropy)
-            + 0.20 * top_gap
-            + 0.15 * macro,
-            0.0,
-            1.0,
-        )
+    certainty = np.clip(
+        0.20
+        + 0.25 * post_conf
+        + 0.20 * (1.0 - entropy)
+        + 0.20 * top_gap
+        + 0.15 * macro,
+        0.0,
+        1.0,
+    )
     alpha = 0.45 * certainty
-    if bool(enable_macro_guard):
-        p1d_half_rescue = (p1d_half >= 0.35) & (macro >= 0.66) & (motion_direct >= 0.35)
-        alpha[p1d_half_rescue] = np.maximum(
-            alpha[p1d_half_rescue],
-            0.45 * p1d_half[p1d_half_rescue] * (0.70 + 0.30 * motion_direct[p1d_half_rescue]),
-        )
-    else:
-        p1d_half_rescue = (p1d_half >= 0.35) & (macro >= 0.66)
-        alpha[p1d_half_rescue] = np.maximum(alpha[p1d_half_rescue], 0.45 * p1d_half[p1d_half_rescue])
+    p1d_half_rescue = (p1d_half >= 0.35) & (macro >= 0.66)
+    alpha[p1d_half_rescue] = np.maximum(alpha[p1d_half_rescue], 0.45 * p1d_half[p1d_half_rescue])
 
     ambiguous_alias = (entropy >= 0.94) & (top_gap <= 0.12) & (p1d_half < 0.25)
     alpha[ambiguous_alias] *= 0.20
     unresolved_p1d_alias = (p1d_half >= 0.35) & (motion_direct < 0.25)
-    if bool(enable_macro_guard):
-        alpha[unresolved_p1d_alias] *= 0.25
-    if bool(enable_role_guard):
-        alpha *= (1.0 - 0.40 * morphology_alias)
-        alpha *= (1.0 - 0.35 * abstain_pressure)
     weak_macro = macro < 0.34
     alpha[weak_macro] *= 0.50
     weak_direct_macro = direct_macro < 0.34
-    if bool(enable_macro_guard):
-        alpha[weak_direct_macro] *= 0.65
-        alpha *= (1.0 - 0.55 * alias_risk)
-        specific_posterior_correction = (
-            (post_conf >= 0.18)
-            & (entropy <= 0.90)
-            & (top_gap >= 0.20)
-            & (support >= 0.24)
-            & (direct_support >= 0.08)
-            & (macro >= 0.60)
-            & (direct_macro >= 0.45)
-            & (alias_risk <= 0.55)
-        )
-        if bool(enable_role_guard):
-            specific_posterior_correction &= (h1_role >= 0.35) & (abstain_pressure <= 0.65)
-    else:
-        specific_posterior_correction = (
-            (post_conf >= 0.18)
-            & (entropy <= 0.90)
-            & (top_gap >= 0.20)
-            & (support >= 0.24)
-            & (direct_support >= 0.08)
-            & (macro >= 0.60)
-        )
-    if bool(enable_specificity_boost):
-        alpha[specific_posterior_correction] = np.maximum(
-            alpha[specific_posterior_correction],
-            0.32 * (0.70 + 0.30 * support[specific_posterior_correction]),
-        )
+    specific_posterior_correction = (
+        (post_conf >= 0.18)
+        & (entropy <= 0.90)
+        & (top_gap >= 0.20)
+        & (support >= 0.24)
+        & (direct_support >= 0.08)
+        & (macro >= 0.60)
+    )
 
     # Target-computable downshift guard.
     #
@@ -3919,28 +3381,14 @@ def _calibrated_posterior_mean_readout(
     # used and the state update is unchanged.
     delta_hz = post - base
     large_downshift = (delta_hz <= -0.035) | (post <= 0.82 * np.maximum(base, 1e-6))
-    if bool(enable_macro_guard):
-        well_supported_downshift = (
-            (post_conf >= 0.22)
-            & (entropy <= 0.88)
-            & (top_gap >= 0.18)
-            & (support >= 0.25)
-            & (direct_support >= 0.10)
-            & (macro >= 0.50)
-            & (direct_macro >= 0.40)
-            & (alias_risk <= 0.60)
-        )
-        if bool(enable_role_guard):
-            well_supported_downshift &= (h1_role >= 0.30) & (abstain_pressure <= 0.70)
-    else:
-        well_supported_downshift = (
-            (post_conf >= 0.22)
-            & (entropy <= 0.88)
-            & (top_gap >= 0.18)
-            & (support >= 0.25)
-            & (direct_support >= 0.10)
-            & (macro >= 0.50)
-        )
+    well_supported_downshift = (
+        (post_conf >= 0.22)
+        & (entropy <= 0.88)
+        & (top_gap >= 0.18)
+        & (support >= 0.25)
+        & (direct_support >= 0.10)
+        & (macro >= 0.50)
+    )
     weak_downshift = large_downshift & ~well_supported_downshift
     alpha[weak_downshift] *= 0.25
 
@@ -3977,87 +3425,10 @@ def _calibrated_posterior_mean_readout(
         "well_supported_downshift_fraction": float(np.mean(well_supported_downshift & large_downshift & valid)),
         "guarded_downshift_fraction": float(np.mean(weak_downshift & valid)),
         "high_base_conflict_fraction": float(np.mean(high_base_conflict & valid)),
-        "specificity_boost_enabled": bool(enable_specificity_boost),
-        "macro_guard_enabled": bool(enable_macro_guard),
-        "role_guard_enabled": bool(enable_role_guard),
+        "specificity_boost_enabled": False,
+        "macro_guard_enabled": False,
+        "role_guard_enabled": False,
         "specific_posterior_correction_fraction": float(np.mean(specific_posterior_correction & valid)),
-    }
-    return out.tolist(), confidence.tolist(), meta
-
-
-def _source_validity_guarded_readout(
-    base_rate: Sequence[float],
-    base_confidence: Sequence[float],
-    source_rate: Sequence[float],
-    source_confidence: Sequence[float],
-    source_meta: Dict[str, object],
-    *,
-    min_hz: float,
-    max_hz: float,
-) -> Tuple[Optional[List[float]], Optional[List[float]], Dict[str, object]]:
-    """Use source-validity as a specificity-gated correction, not a selector."""
-    base = np.asarray(base_rate, dtype=np.float64).reshape(-1)
-    base_conf = np.asarray(base_confidence, dtype=np.float64).reshape(-1)
-    source = np.asarray(source_rate, dtype=np.float64).reshape(-1)
-    source_conf = np.asarray(source_confidence, dtype=np.float64).reshape(-1)
-    n = min(base.size, base_conf.size, source.size, source_conf.size)
-    if n <= 0:
-        return None, None, {"enabled": False, "reason": "empty_arrays"}
-    base = base[:n]
-    base_conf = np.clip(np.nan_to_num(base_conf[:n], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-    source = source[:n]
-    source_conf = np.clip(np.nan_to_num(source_conf[:n], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-    valid = (
-        np.isfinite(base)
-        & np.isfinite(source)
-        & (base >= float(min_hz))
-        & (base <= float(max_hz))
-        & (source >= float(min_hz))
-        & (source <= float(max_hz))
-        & (base_conf > 0.0)
-        & (source_conf > 0.0)
-    )
-    if not np.any(valid):
-        return None, None, {"enabled": False, "reason": "no_valid_overlap"}
-
-    entropy_median = _finite_row_float(source_meta, "source_validity_entropy_median", 1.0)
-    top_gap_median = _finite_row_float(source_meta, "source_validity_top_gap_median", 0.0)
-    confidence_mean = _finite_row_float(source_meta, "confidence_mean", 0.0)
-    source_specificity = np.clip((source_conf - 0.24) / 0.30, 0.0, 1.0)
-    global_specificity = float(np.clip(
-        (0.35 + 0.65 * max(0.0, 1.0 - float(entropy_median)))
-        * (0.45 + 0.55 * float(top_gap_median))
-        * (0.50 + 0.50 * float(confidence_mean)),
-        0.0,
-        1.0,
-    ))
-    conflict = np.abs(source - base)
-    conflict_ok = np.exp(-0.5 * (conflict / 0.08) ** 2)
-    alpha = 0.32 * source_specificity * global_specificity * (0.35 + 0.65 * conflict_ok)
-
-    # Large disagreements are allowed only if the source posterior itself is
-    # strong.  Otherwise source-validity is treated as abstention evidence.
-    unsafe_conflict = (conflict > 0.08) & (source_conf < 0.45)
-    alpha[unsafe_conflict] *= 0.20
-    alpha = np.where(valid, np.clip(alpha, 0.0, 0.35), 0.0)
-
-    out = base.copy()
-    out[valid] = np.clip(
-        base[valid] + alpha[valid] * (source[valid] - base[valid]),
-        float(min_hz),
-        float(max_hz),
-    )
-    confidence = np.where(valid, np.maximum(base_conf, alpha), 0.0)
-    meta = {
-        "enabled": True,
-        "source": "source_validity_guarded",
-        "calibration": "preserve_final_source_validity_bounded_correction",
-        "coverage": float(np.mean(valid)),
-        "source_validity_guard_alpha_mean": float(np.mean(alpha[valid])) if np.any(valid) else 0.0,
-        "source_validity_guard_alpha_median": float(np.median(alpha[valid])) if np.any(valid) else 0.0,
-        "source_validity_guard_active_fraction": float(np.mean(alpha > 1e-6)),
-        "source_validity_guard_unsafe_conflict_fraction": float(np.mean(unsafe_conflict & valid)),
-        "source_validity_global_specificity": global_specificity,
     }
     return out.tolist(), confidence.tolist(), meta
 
@@ -4531,7 +3902,7 @@ def _require_locked_activation(
         )
 
 
-def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[Dict[str, object]], List[Dict[str, object]], Optional[str]]:
+def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Optional[str]]:
     path_str, out_data_str, cfg = args
     path = Path(path_str)
     out_data = Path(out_data_str)
@@ -4566,7 +3937,7 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
             rate_tracks.append(_fit_length(rate_track, signal.size))
             names.append(family_name)
         if len(channels) < 3:
-            return path.name, [], [], f"not enough channels ({len(channels)}), missing={missing}"
+            return path.name, f"not enough channels ({len(channels)}), missing={missing}"
 
         reliability_by_video = cfg.get("reliability_priors_by_video", {})
         if not isinstance(reliability_by_video, dict):
@@ -4638,13 +4009,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
             channel_reliability_priors,
         )
         state_role_runtime = {}
-        if str(cfg.get("reliability_prior_scope", "all")).strip().lower() != "readout_only":
-            state_role_runtime = _state_role_prior_runtime(
-                names,
-                state_window_rows,
-                stack.shape[1],
-                fps,
-            )
         rate_anchor_runtime, rate_anchor_confidence_runtime, rate_anchor_meta = _windowed_rate_anchor_runtime(
             names,
             rate_tracks,
@@ -4673,13 +4037,9 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
                 float(cfg["min_hz"]),
                 float(cfg["max_hz"]),
                 enable_rate_hypothesis_graph_v4=bool(cfg.get("enable_rate_hypothesis_graph", False)),
-                enable_derived_consistency_scaling=bool(cfg.get("enable_derived_consistency_scaling", False)),
             )
         rate_posterior_runtime = None
         rate_posterior_meta: Dict[str, object] = {"enabled": False}
-        source_validity_runtime = None
-        source_validity_confidence_runtime = None
-        source_validity_meta: Dict[str, object] = {"enabled": False}
         if bool(cfg.get("enable_rate_posterior", False)):
             rate_posterior_runtime, rate_posterior_meta = _candidate_rate_posterior_runtime(
                 names,
@@ -4691,22 +4051,12 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
                 readout_reliability_group_prior,
                 float(cfg["min_hz"]),
                 float(cfg["max_hz"]),
-                enable_derived_consistency_scaling=bool(cfg.get("enable_derived_consistency_scaling", False)),
                 enable_signal_sqi_observability=bool(cfg.get("enable_signal_sqi_observability", False)),
             )
             posterior_output_source = str(cfg.get("rate_posterior_output_source", "off")).strip().lower()
             if (
                 rate_posterior_runtime is not None
-                and posterior_output_source in {
-                    "calibrated_mean",
-                    "specific_calibrated_mean",
-                    "macroguard_specific_calibrated_mean",
-                    "roleaware_macroguard_specific_calibrated_mean",
-                    "source_validity_guarded",
-                    "source_arbiter_v1",
-                    "source_arbiter_v2",
-                    "source_arbiter_v3",
-                }
+                and posterior_output_source == "calibrated_mean"
                 and output_rate_runtime is not None
                 and output_rate_confidence_runtime is not None
             ):
@@ -4720,15 +4070,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
                     rate_posterior_runtime,
                     min_hz=float(cfg["min_hz"]),
                     max_hz=float(cfg["max_hz"]),
-                    enable_specificity_boost=posterior_output_source
-                    in {
-                        "specific_calibrated_mean",
-                        "macroguard_specific_calibrated_mean",
-                        "roleaware_macroguard_specific_calibrated_mean",
-                    },
-                    enable_macro_guard=posterior_output_source
-                    in {"macroguard_specific_calibrated_mean", "roleaware_macroguard_specific_calibrated_mean"},
-                    enable_role_guard=posterior_output_source == "roleaware_macroguard_specific_calibrated_mean",
                 )
                 if calibrated_rate_runtime is not None and calibrated_confidence_runtime is not None:
                     output_rate_runtime = calibrated_rate_runtime
@@ -4736,91 +4077,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
                     output_rate_meta = {
                         **dict(output_rate_meta or {}),
                         **dict(calibrated_meta or {}),
-                        "posterior_meta": rate_posterior_meta,
-                    }
-                    if posterior_output_source in {"source_arbiter_v1", "source_arbiter_v2", "source_arbiter_v3"}:
-                        output_rate_meta["source"] = (
-                            f"candidate_rate_posterior_calibrated_mean_plus_{posterior_output_source}"
-                        )
-                        output_rate_meta[f"{posterior_output_source}_requested"] = True
-                if (
-                    posterior_output_source == "source_validity_guarded"
-                    and output_rate_runtime is not None
-                    and output_rate_confidence_runtime is not None
-                ):
-                    (
-                        source_validity_runtime,
-                        source_validity_confidence_runtime,
-                        source_validity_meta,
-                    ) = _source_validity_rate_readout_runtime(
-                        names,
-                        stack,
-                        rate_tracks,
-                        readout_window_rows,
-                        stack.shape[1],
-                        fps,
-                        readout_reliability_group_prior,
-                        float(cfg["min_hz"]),
-                        float(cfg["max_hz"]),
-                    )
-                    if source_validity_runtime is not None and source_validity_confidence_runtime is not None:
-                        guarded_rate_runtime, guarded_confidence_runtime, guarded_meta = _source_validity_guarded_readout(
-                            output_rate_runtime,
-                            output_rate_confidence_runtime,
-                            source_validity_runtime,
-                            source_validity_confidence_runtime,
-                            source_validity_meta,
-                            min_hz=float(cfg["min_hz"]),
-                            max_hz=float(cfg["max_hz"]),
-                        )
-                        if guarded_rate_runtime is not None and guarded_confidence_runtime is not None:
-                            output_rate_runtime = guarded_rate_runtime
-                            output_rate_confidence_runtime = guarded_confidence_runtime
-                            output_rate_meta = {
-                                **dict(output_rate_meta or {}),
-                                **dict(guarded_meta or {}),
-                                **dict(source_validity_meta or {}),
-                                "source": "source_validity_guarded",
-                                "source_validity_guarded_output": True,
-                                "posterior_meta": rate_posterior_meta,
-                            }
-            elif rate_posterior_runtime is not None and posterior_output_source in {"mode", "mean"}:
-                output_key = "mode_hz" if posterior_output_source == "mode" else "mean_hz"
-                posterior_rate = rate_posterior_runtime.get(output_key)
-                posterior_conf = rate_posterior_runtime.get("confidence")
-                if posterior_rate is not None and posterior_conf is not None:
-                    output_rate_runtime = posterior_rate
-                    output_rate_confidence_runtime = posterior_conf
-                    output_rate_meta = {
-                        "enabled": True,
-                        "source": f"candidate_rate_posterior_{posterior_output_source}",
-                        "posterior_output_override": True,
-                        "posterior_meta": rate_posterior_meta,
-                    }
-            elif posterior_output_source == "source_validity":
-                (
-                    source_validity_runtime,
-                    source_validity_confidence_runtime,
-                    source_validity_meta,
-                ) = _source_validity_rate_readout_runtime(
-                    names,
-                    stack,
-                    rate_tracks,
-                    readout_window_rows,
-                    stack.shape[1],
-                    fps,
-                    readout_reliability_group_prior,
-                    float(cfg["min_hz"]),
-                    float(cfg["max_hz"]),
-                )
-                if source_validity_runtime is not None and source_validity_confidence_runtime is not None:
-                    output_rate_runtime = source_validity_runtime
-                    output_rate_confidence_runtime = source_validity_confidence_runtime
-                    output_rate_meta = {
-                        "enabled": True,
-                        "source": "source_validity_posterior",
-                        "source_validity_output_override": True,
-                        **dict(source_validity_meta or {}),
                         "posterior_meta": rate_posterior_meta,
                     }
         regime_law_meta: Dict[str, object] = {"enabled": False}
@@ -4926,11 +4182,11 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
                 cfg.get("rate_posterior_output_public_source", cfg.get("rate_posterior_output_source", "off"))
             ),
             "rate_hypothesis_graph_enabled": bool(cfg.get("enable_rate_hypothesis_graph", False)),
-            "derived_consistency_scaling_enabled": bool(cfg.get("enable_derived_consistency_scaling", False)),
+            "derived_consistency_scaling_enabled": False,
             "signal_sqi_observability_enabled": bool(cfg.get("enable_signal_sqi_observability", False)),
             "decoupled_rate_readout_meta": output_rate_meta,
             "rate_candidate_posterior_meta": rate_posterior_meta,
-            "source_validity_meta": source_validity_meta,
+            "source_validity_meta": {"enabled": False},
             "target_observability_control_enabled": bool(target_observability_runtime is not None),
             "target_observability_control_meta": target_observability_meta,
         }
@@ -4945,13 +4201,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
         if target_observability_runtime is not None:
             run_meta["external_target_observability_runtime"] = target_observability_runtime
             run_meta["enable_target_observability_control_runtime"] = True
-        posterior_output_source_runtime = str(cfg.get("rate_posterior_output_source", "off")).strip().lower()
-        if posterior_output_source_runtime == "source_arbiter_v1":
-            run_meta["enable_rate_source_arbiter_v1_runtime"] = True
-        if posterior_output_source_runtime == "source_arbiter_v2":
-            run_meta["enable_rate_source_arbiter_v2_runtime"] = True
-        if posterior_output_source_runtime == "source_arbiter_v3":
-            run_meta["enable_rate_source_arbiter_v3_runtime"] = True
         if str(cfg.get("parh_input", "canonical")) == "multichannel":
             run_meta["observation_families"] = names
             run_meta["external_channel_context_prior"] = [
@@ -4983,145 +4232,9 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, List[D
         with out_path.open("wb") as f:
             pickle.dump(out_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-        rows: List[Dict[str, object]] = []
-        for row in cal_rows:
-            rows.append(
-                {
-                    "data_file": path.name,
-                    "video": path.stem,
-                    "method": method_name,
-                    "fps": fps,
-                    **row,
-                    "anchor_score": float(cal_meta["anchor_score"]),
-                    "anchor_n_support_families": int(cal_meta["anchor_n_support_families"]),
-                }
-            )
-        readout_rows: List[Dict[str, object]] = []
-        if output_rate_meta:
-            posterior_meta = output_rate_meta.get("posterior_meta", {})
-            posterior_meta = posterior_meta if isinstance(posterior_meta, dict) else {}
-            readout_rows.append(
-                {
-                    "data_file": path.name,
-                    "video": path.stem,
-                    "method": method_name,
-                    "enabled": bool(output_rate_meta.get("enabled", False)),
-                    "readout_abstained": bool(output_rate_meta.get("release_hard_abstention", False)),
-                    "readout_inactive_reason": str(output_rate_meta.get("reason", "")),
-                    "release_hard_abstention": bool(
-                        output_rate_meta.get("release_hard_abstention", False)
-                    ),
-                    "source": str(output_rate_meta.get("source", "")),
-                    "calibration": str(output_rate_meta.get("calibration", "")),
-                    "abstention_guard": str(output_rate_meta.get("abstention_guard", "")),
-                    "coverage": float(output_rate_meta.get("coverage", np.nan)),
-                    "alpha_mean": float(output_rate_meta.get("alpha_mean", np.nan)),
-                    "alpha_median": float(output_rate_meta.get("alpha_median", np.nan)),
-                    "alpha_active_fraction": float(output_rate_meta.get("alpha_active_fraction", np.nan)),
-                    "ambiguous_alias_fraction": float(output_rate_meta.get("ambiguous_alias_fraction", np.nan)),
-                    "unresolved_p1d_alias_fraction": float(
-                        output_rate_meta.get("unresolved_p1d_alias_fraction", np.nan)
-                    ),
-                    "p1d_half_rescue_fraction": float(output_rate_meta.get("p1d_half_rescue_fraction", np.nan)),
-                    "weak_direct_macro_fraction": float(output_rate_meta.get("weak_direct_macro_fraction", np.nan)),
-                    "alias_risk_mean": float(output_rate_meta.get("alias_risk_mean", np.nan)),
-                    "h1_role_support_mean": float(output_rate_meta.get("h1_role_support_mean", np.nan)),
-                    "morphology_alias_pressure_mean": float(
-                        output_rate_meta.get("morphology_alias_pressure_mean", np.nan)
-                    ),
-                    "abstain_pressure_mean": float(output_rate_meta.get("abstain_pressure_mean", np.nan)),
-                    "large_downshift_fraction": float(output_rate_meta.get("large_downshift_fraction", np.nan)),
-                    "well_supported_downshift_fraction": float(
-                        output_rate_meta.get("well_supported_downshift_fraction", np.nan)
-                    ),
-                    "guarded_downshift_fraction": float(output_rate_meta.get("guarded_downshift_fraction", np.nan)),
-                    "high_base_conflict_fraction": float(output_rate_meta.get("high_base_conflict_fraction", np.nan)),
-                    "posterior_confidence_mean": float(posterior_meta.get("confidence_mean", np.nan)),
-                    "posterior_entropy_median": float(posterior_meta.get("posterior_entropy_median", np.nan)),
-                    "posterior_top_gap_median": float(posterior_meta.get("posterior_top_gap_median", np.nan)),
-                    "posterior_macro_support_median": float(posterior_meta.get("macro_support_median", np.nan)),
-                    "posterior_direct_macro_support_median": float(
-                        posterior_meta.get("direct_macro_support_median", np.nan)
-                    ),
-                    "posterior_motion_direct_support_median": float(
-                        posterior_meta.get("motion_direct_support_median", np.nan)
-                    ),
-                    "posterior_alias_risk_median": float(posterior_meta.get("alias_risk_median", np.nan)),
-                    "posterior_independent_timing_support_median": float(
-                        posterior_meta.get("independent_timing_support_median", np.nan)
-                    ),
-                    "posterior_bridge_timing_preservation_median": float(
-                        posterior_meta.get("bridge_timing_preservation_median", np.nan)
-                    ),
-                    "posterior_morphology_alias_pressure_median": float(
-                        posterior_meta.get("morphology_alias_pressure_median", np.nan)
-                    ),
-                    "posterior_h1_role_support_median": float(posterior_meta.get("h1_role_support_median", np.nan)),
-                    "posterior_abstain_pressure_median": float(posterior_meta.get("abstain_pressure_median", np.nan)),
-                    "posterior_signal_sqi_observability_enabled": bool(
-                        posterior_meta.get("signal_sqi_observability_enabled", False)
-                    ),
-                    "posterior_signal_sqi_support_median": float(
-                        posterior_meta.get("signal_sqi_support_median", np.nan)
-                    ),
-                    "posterior_phase_coherence_support_median": float(
-                        posterior_meta.get("phase_coherence_support_median", np.nan)
-                    ),
-                    "source_validity_confidence_mean": float(
-                        output_rate_meta.get("confidence_mean", np.nan)
-                        if output_rate_meta.get("source") in {"source_validity_posterior", "source_validity_guarded"}
-                        else np.nan
-                    ),
-                    "source_validity_entropy_median": float(
-                        output_rate_meta.get("source_validity_entropy_median", np.nan)
-                    ),
-                    "source_validity_top_gap_median": float(
-                        output_rate_meta.get("source_validity_top_gap_median", np.nan)
-                    ),
-                    "source_validity_mode_hz_median": float(
-                        output_rate_meta.get("source_validity_mode_hz_median", np.nan)
-                    ),
-                    "source_validity_selected_group_counts": json.dumps(
-                        output_rate_meta.get("selected_group_counts", {}),
-                        sort_keys=True,
-                    ),
-                    "source_validity_guard_alpha_mean": float(
-                        output_rate_meta.get("source_validity_guard_alpha_mean", np.nan)
-                    ),
-                    "source_validity_guard_alpha_median": float(
-                        output_rate_meta.get("source_validity_guard_alpha_median", np.nan)
-                    ),
-                    "source_validity_guard_active_fraction": float(
-                        output_rate_meta.get("source_validity_guard_active_fraction", np.nan)
-                    ),
-                    "source_validity_global_specificity": float(
-                        output_rate_meta.get("source_validity_global_specificity", np.nan)
-                    ),
-                    "specificity_boost_enabled": bool(output_rate_meta.get("specificity_boost_enabled", False)),
-                    "specific_posterior_correction_fraction": float(
-                        output_rate_meta.get("specific_posterior_correction_fraction", np.nan)
-                    ),
-                    "readout_group_rate_mode_counts": json.dumps(
-                        output_rate_meta.get("group_rate_mode_counts", {}),
-                        sort_keys=True,
-                    ),
-                    "posterior_group_rate_mode_counts": json.dumps(
-                        posterior_meta.get("group_rate_mode_counts", {}),
-                        sort_keys=True,
-                    ),
-                    "readout_derived_consistency_counts": json.dumps(
-                        output_rate_meta.get("derived_consistency_counts", {}),
-                        sort_keys=True,
-                    ),
-                    "posterior_derived_consistency_counts": json.dumps(
-                        posterior_meta.get("derived_consistency_counts", {}),
-                        sort_keys=True,
-                    ),
-                }
-            )
-        return path.name, rows, readout_rows, None
+        return path.name, None
     except Exception as exc:
-        return path.name, [], [], f"{type(exc).__name__}: {exc}"
+        return path.name, f"{type(exc).__name__}: {exc}"
 
 
 def _worker_count(requested: int) -> int:
@@ -5135,88 +4248,6 @@ def _worker_count(requested: int) -> int:
             except ValueError:
                 pass
     return 1
-
-
-def _write_activation_audit(out_data: Path, metrics_dir: Path) -> None:
-    rows: List[Dict[str, object]] = []
-    for path in sorted(Path(out_data).glob("*.pkl")):
-        try:
-            payload = _load_pkl(path)
-            estimates = payload.get("estimates") or []
-            est = estimates[0].get("estimate", {}) if estimates and isinstance(estimates[0], dict) else {}
-            meta_raw = est.get("meta", {})
-            meta = json.loads(meta_raw) if isinstance(meta_raw, str) else dict(meta_raw or {})
-            diag = meta.get("parh_ossm_diagnostics", {})
-            obs_law = meta.get("observation_law", {})
-            phase_morph = meta.get("phase_anchored_morphology", {})
-            residual_guard = meta.get("residual_identifiability_guard", {})
-            rows.append(
-                {
-                    "video": path.stem,
-                    "observation_law_enabled": bool(obs_law.get("enabled", False)),
-                    "reliability_prior_scope": str(meta.get("reliability_prior_scope", "")),
-                    "windowed_reliability_prior_applied": bool(
-                        meta.get("target_reliability_windowed_prior", False)
-                    ),
-                    "state_role_prior_applied": bool(meta.get("target_state_role_prior", False)),
-                    "separate_reliability_csvs": bool(meta.get("separate_reliability_csvs", False)),
-                    "target_observability_control_enabled": bool(
-                        meta.get("target_observability_control_enabled", False)
-                    ),
-                    "external_rate_posterior_applied": bool(meta.get("external_rate_posterior_applied", False)),
-                    "external_rate_posterior_coverage": float(
-                        diag.get("external_rate_posterior_coverage", np.nan)
-                    ),
-                    "external_rate_posterior_blend_active_frac": float(
-                        diag.get("external_rate_posterior_blend_active_frac", np.nan)
-                    ),
-                    "mixture_entropy_mean": float(diag.get("mixture_entropy_mean", np.nan)),
-                    "residual_guard_enabled": bool(residual_guard.get("enabled", False)),
-                    "residual_gate_mean": float(diag.get("residual_gate_mean", np.nan)),
-                    "residual_failure_absorption_mean": float(
-                        diag.get("residual_failure_absorption_mean", np.nan)
-                    ),
-                    "phase_anchored_morphology_enabled": bool(phase_morph.get("enabled", False)),
-                    "phase_anchored_morphology_blend": float(phase_morph.get("blend", np.nan)),
-                    "active_modules": ",".join(str(x) for x in meta.get("active_modules", [])),
-                }
-            )
-        except Exception as exc:
-            rows.append({"video": path.stem, "audit_error": f"{type(exc).__name__}: {exc}"})
-    if not rows:
-        return
-    df = pd.DataFrame(rows).sort_values("video")
-    metrics_dir.mkdir(parents=True, exist_ok=True)
-    df.to_csv(metrics_dir / "activation_audit_raw.csv", index=False)
-    summary = {
-        "n_trials": int(len(df)),
-        "observation_law_enabled_frac": float(df.get("observation_law_enabled", pd.Series(dtype=float)).mean()),
-        "target_observability_control_enabled_frac": float(
-            df.get("target_observability_control_enabled", pd.Series(dtype=float)).mean()
-        ),
-        "windowed_reliability_prior_applied_frac": float(
-            df.get("windowed_reliability_prior_applied", pd.Series(dtype=float)).mean()
-        ),
-        "state_role_prior_applied_frac": float(
-            df.get("state_role_prior_applied", pd.Series(dtype=float)).mean()
-        ),
-        "external_rate_posterior_applied_frac": float(
-            df.get("external_rate_posterior_applied", pd.Series(dtype=float)).mean()
-        ),
-        "phase_anchored_morphology_enabled_frac": float(
-            df.get("phase_anchored_morphology_enabled", pd.Series(dtype=float)).mean()
-        ),
-        "median_mixture_entropy": float(
-            pd.to_numeric(df.get("mixture_entropy_mean", pd.Series(dtype=float)), errors="coerce").median()
-        ),
-        "median_residual_gate": float(
-            pd.to_numeric(df.get("residual_gate_mean", pd.Series(dtype=float)), errors="coerce").median()
-        ),
-    }
-    (metrics_dir / "activation_audit_summary.json").write_text(
-        json.dumps(summary, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
 
 
 def main() -> int:
@@ -5234,9 +4265,7 @@ def main() -> int:
     data_dir = Path(args.data_dir).expanduser().absolute()
     out_run = Path(args.out_run).expanduser().absolute()
     out_data = out_run / "data"
-    metrics_dir = out_run / "metrics"
     out_data.mkdir(parents=True, exist_ok=True)
-    metrics_dir.mkdir(parents=True, exist_ok=True)
 
     files = sorted(data_dir.glob("*.pkl"))
     if args.max_files and args.max_files > 0:
@@ -5288,145 +4317,36 @@ def main() -> int:
         "rate_posterior_output_role": rate_output_role,
         "enable_target_observability_control": bool(args.enable_target_observability_control),
         "enable_signal_sqi_observability": bool(args.enable_signal_sqi_observability),
-        "enable_derived_consistency_scaling": bool(args.enable_derived_consistency_scaling),
         "enable_observation_law": bool(args.enable_observation_law),
         "enable_regime_observation_law": bool(args.enable_regime_observation_law or args.enable_observation_law),
         "regime_anchor_policy": str(args.regime_anchor_policy),
         "enable_decoupled_rate_readout": bool(args.enable_decoupled_rate_readout or args.enable_observation_law),
         "eval_use_track": bool(args.eval_use_track),
     }
-    manifest_cfg = dict(cfg)
-    manifest_cfg["rate_posterior_output_source"] = rate_output_public
-    manifest_cfg["external_rate_evidence_source"] = args.external_rate_evidence_source
-    manifest_cfg.pop("rate_track_source", None)
-    manifest_cfg.pop("rate_posterior_output_public_source", None)
-    prior_keys = [
-        "reliability_priors_by_video",
-        "windowed_reliability_priors_by_video",
-        "state_reliability_priors_by_video",
-        "state_windowed_reliability_priors_by_video",
-        "readout_reliability_priors_by_video",
-        "readout_windowed_reliability_priors_by_video",
-    ]
-    prior_summary = {
-        key: len(manifest_cfg.get(key) or {})
-        for key in prior_keys
-    }
-    for key in prior_keys:
-        manifest_cfg.pop(key, None)
-    manifest_cfg["reliability_prior_entry_counts"] = prior_summary
-    manifest = {
-        "name": args.name,
-        "source_key": args.source_key,
-        "data_dir": str(data_dir),
-        "out_run": str(out_run),
-        "n_files": len(files),
-        "release_status": (
-            "release_candidate"
-            if (
-                bool(args.enable_observation_law)
-                and bool(args.enable_rate_posterior)
-                and rate_output_public == "final"
-            )
-            else "diagnostic_or_ablation"
-        ),
-        "nested_comparator": "",
-        "parh_input": str(args.parh_input),
-        "external_rate_evidence_source": str(args.external_rate_evidence_source),
-        "rate_posterior_output_source": rate_output_public,
-        "rate_posterior_output_role": cfg["rate_posterior_output_role"],
-        "enable_observation_law": bool(args.enable_observation_law),
-        "enable_rate_posterior": bool(args.enable_rate_posterior),
-        "eval_use_track": bool(args.eval_use_track),
-        "methods": [
-            {"method_label": m, "family_name": f, "group": FAMILY_GROUPS.get(f, g)}
-            for m, f, g in DEFAULT_METHODS
-        ],
-        "cfg": manifest_cfg,
-    }
-    (metrics_dir / "calibrated_multifamily_manifest.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    if bool(args.enable_rate_posterior) and cfg["rate_posterior_output_role"] == "diagnostic_or_compatibility":
-        print(
-            "[materialize] WARNING: --rate-posterior-output-source="
-            f"{rate_output_public} is marked diagnostic/compatibility, "
-            "not release. Use final for the current bounded "
-            "locked readout."
-        )
-
     jobs = _worker_count(args.jobs)
     tasks = [(str(p), str(out_data), cfg) for p in files]
-    rows: List[Dict[str, object]] = []
-    readout_rows: List[Dict[str, object]] = []
     errors: List[str] = []
     print(f"> Materializing {len(tasks)} calibrated multi-family PARH trials with jobs={jobs}")
     if jobs == 1:
         for task in tasks:
-            name, task_rows, task_readout_rows, err = _process_file(task)
-            rows.extend(task_rows)
-            readout_rows.extend(task_readout_rows)
+            name, err = _process_file(task)
             if err:
                 errors.append(f"{name}: {err}")
     else:
         with ProcessPoolExecutor(max_workers=jobs) as ex:
             futures = [ex.submit(_process_file, task) for task in tasks]
             for fut in as_completed(futures):
-                name, task_rows, task_readout_rows, err = fut.result()
-                rows.extend(task_rows)
-                readout_rows.extend(task_readout_rows)
+                name, err = fut.result()
                 if err:
                     errors.append(f"{name}: {err}")
 
-    if rows:
-        pd.DataFrame(rows).sort_values(["data_file", "channel"]).to_csv(
-            metrics_dir / "calibration_raw.csv",
-            index=False,
-        )
-        summary = (
-            pd.DataFrame(rows)
-            .groupby(["anchor", "channel"], dropna=False)
-            .agg(
-                n=("data_file", "count"),
-                corr_median=("corr", "median"),
-                support_median=("support", "median"),
-                lag_samples_median=("lag_samples", "median"),
-                residual_mad_median=("residual_mad", "median"),
-            )
-            .reset_index()
-        )
-        summary.to_csv(metrics_dir / "calibration_summary.csv", index=False)
-    if readout_rows:
-        readout_df = pd.DataFrame(readout_rows).sort_values(["data_file"])
-        readout_df.to_csv(metrics_dir / "readout_guard_raw.csv", index=False)
-        numeric_cols = [
-            c
-            for c in readout_df.columns
-            if c not in {"data_file", "video", "method", "source", "calibration", "abstention_guard"}
-            and pd.api.types.is_numeric_dtype(readout_df[c])
-        ]
-        if numeric_cols:
-            summary_row = {
-                "method": str(args.name),
-                "n_trials": int(len(readout_df)),
-            }
-            for col in numeric_cols:
-                vals = pd.to_numeric(readout_df[col], errors="coerce")
-                summary_row[f"{col}_median"] = float(vals.median()) if vals.notna().any() else float("nan")
-                summary_row[f"{col}_mean"] = float(vals.mean()) if vals.notna().any() else float("nan")
-            pd.DataFrame([summary_row]).to_csv(metrics_dir / "readout_guard_summary.csv", index=False)
-    _write_activation_audit(out_data, metrics_dir)
-    errors_path = metrics_dir / "materialization_errors.txt"
     if errors:
-        errors_path.write_text("\n".join(errors) + "\n", encoding="utf-8")
+        print("\n".join(errors))
         print(f"> Materialization completed with {len(errors)} skipped/error trials")
         if _is_strict_release_cfg(cfg):
-            print("> Locked activation contract failed; refusing to continue to evaluation.")
+            print("> Locked activation contract failed.")
             return 1
     else:
-        if errors_path.exists():
-            errors_path.unlink()
         print("> Materialization completed without skipped trials")
     return 0
 
