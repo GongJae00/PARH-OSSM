@@ -83,7 +83,7 @@ tests/          tests that pin the filters, the reference rates, and the control
 | Confirmatory tests on MAHNOB-HCI | `evaluation/confirmatory_test.py`, `mahnob_test_scores.sh` |
 | Agreement across trials (Supplementary) | `evaluation/rate_agreement.py`, `stage_slopes.py`, `observation_track_slope.py`, `figures/rate_agreement_figure.py` |
 | Error under motion | `evaluation/head_motion.py`, `motion_tertiles.py`, `motion_perturbation.sh` |
-| Supplementary tables | `evaluation/supplementary_tables.py`, `parameter_table.py` |
+| Supplementary tables | `evaluation/cohface_scores.sh`, `supplementary_tables.py`, `parameter_table.py` |
 
 ## Running
 
@@ -125,6 +125,14 @@ COHFACE rows of Tables 2 and 3 are reproduced in four steps; COHFACE is the data
    evaluation/bank_rates.sh cohface <work dir>/data <records dir> 8
    evaluation/main_tables.sh <records dir> cohface > table_rows.tex
    ```
+
+The Supplementary tables also need the three reliability controls and the banks with part of the observations
+left out. Run `estimate/materialize.sh` for `equal_readout`, `shuffled_readout`, and `equal_filter`, and run it with
+the `frozen` flags and the full bank's priors on each copy that `estimate/leave_one_out_data.py` makes (`no_torso`,
+`no_of`, `no_dof`, `no_p1d`, `no_bridges`, `no_p1d_cubic`, `no_p1d_consensus`), each into the runs folder under the
+name of its variant. Pass these runs to `window_rates.sh`, compute the head motion with `evaluation/head_motion.py`
+and the perturbed copies with `evaluation/motion_perturbation.sh`, and run `evaluation/cohface_scores.sh`, which writes the COHFACE waveform table and the remaining inputs of the
+Supplementary tables. `evaluation/mahnob_test_scores.sh` then writes the Supplementary tables of both datasets.
 
 `python -m pytest` runs the tests.
 
