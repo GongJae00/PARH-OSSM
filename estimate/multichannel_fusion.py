@@ -132,11 +132,11 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
             "Materialize a GT-free target-calibrated multi-family observation stack, "
-            "run PARH-OSSM on it, and optionally evaluate the synthetic run."
+            "run PARH-OSSM on it, and write one pickle per trial."
         )
     )
     p.add_argument("--data-dir", required=True, help="Input run data directory containing PKL trials.")
-    p.add_argument("--out-run", required=True, help="Output run directory. It will contain data/ and metrics/.")
+    p.add_argument("--out-run", required=True, help="Output run directory. It will contain data/.")
     p.add_argument("--name", default="target_calibrated_multifamily_parh_ossm")
     p.add_argument("--source-key", default="signal_hat", choices=["signal_hat", "z_osc", "z_full"])
     p.add_argument(
@@ -264,13 +264,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--regime-anchor-policy",
-        choices=["context_only", "replace"],
+        choices=["context_only"],
         default="context_only",
         help=(
-            "How the regime law affects the local z_osc anchor. context_only "
-            "is the safe default: use the regime law for channel precision but "
-            "keep the spectral+harmonic anchor. replace is a no-go diagnostic "
-            "that lets the regime law replace the anchor track."
+            "How the regime law affects the local z_osc anchor: it sets the "
+            "channel precision and keeps the spectral+harmonic anchor."
         ),
     )
     p.add_argument(
@@ -320,9 +318,7 @@ def parse_args() -> argparse.Namespace:
             "Select how the candidate-rate posterior affects the decoupled "
             "z_osc rate readout. Use 'final' for the release bounded "
             "readout, or 'off' to keep posterior evidence as state-update/"
-            "diagnostic context without overriding the readout. Legacy "
-            "diagnostic names are accepted for old analysis scripts but are "
-            "not release."
+            "diagnostic context without overriding the readout."
         ),
     )
     p.add_argument(
@@ -4048,18 +4044,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
             )
             if regime_context_runtime is not None:
                 channel_context_runtime = regime_context_runtime
-            if (
-                str(cfg.get("regime_anchor_policy", "context_only")) == "replace"
-                and regime_rate_anchor_runtime is not None
-                and regime_rate_anchor_confidence_runtime is not None
-            ):
-                rate_anchor_runtime = regime_rate_anchor_runtime
-                rate_anchor_confidence_runtime = regime_rate_anchor_confidence_runtime
-                rate_anchor_meta = {
-                    "source": "regime_observation_law",
-                    **dict(rate_anchor_meta or {}),
-                    "regime_observation_law": regime_law_meta,
-                }
         target_observability_runtime = None
         target_observability_meta: Dict[str, object] = {"enabled": False}
         if bool(cfg.get("enable_target_observability_control", False)):
