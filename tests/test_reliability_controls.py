@@ -1,5 +1,4 @@
 import os
-import pickle
 import subprocess
 import sys
 
@@ -40,17 +39,3 @@ def test_shuffled_control_keeps_each_groups_scores_within_its_trial(tmp_path):
     for (video, group), rows in original.groupby(["video", "group"]):
         shuffled = controlled[(controlled.video == video) & (controlled.group == group)]
         assert sorted(shuffled.score) == sorted(rows.score)
-
-
-def test_leave_one_out_removes_the_signal_and_both_filter_rows(tmp_path):
-    names = ["torso_shift", "torso_shift__kfstd", "torso_shift__parh_ossm", "DoF", "DoF__kfstd", "of_farneback"]
-    source, copy = tmp_path / "source", tmp_path / "copy"
-    source.mkdir()
-    with open(source / "mahnob_1.pkl", "wb") as f:
-        pickle.dump({"estimates": [{"method": name, "estimate": {}} for name in names]}, f)
-
-    subprocess.run([sys.executable, os.path.join(ESTIMATE, "leave_one_out_data.py"), str(source), str(copy), "no_torso"], check=True)
-
-    with open(copy / "mahnob_1.pkl", "rb") as f:
-        kept = [e["method"] for e in pickle.load(f)["estimates"]]
-    assert kept == ["DoF", "DoF__kfstd", "of_farneback"]

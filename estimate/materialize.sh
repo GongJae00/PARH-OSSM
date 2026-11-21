@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the multichannel PARH-OSSM filter on a folder of observation pickles with the frozen flags, or with
-# one thing changed: a rung of the component ladder or a control.
+# one thing changed: a rung of the component ladder, a control, or a measurement route left out of the bank.
 #
 #   frozen              the reported PARH-OSSM (the flags below)
 #   plain_multichannel  rung 1: the multichannel filter alone, the rate is its own frequency track
@@ -10,16 +10,18 @@
 #   equal_readout       control: readout priors equal across observations in each window
 #   shuffled_readout    control: each observation's prior windows permuted within the trial
 #   equal_filter        control: the filter's per-observation trust replaced by its mean over observations
-#   no_of no_dof no_p1d no_bridges no_p1d_cubic no_p1d_consensus no_torso
-#                       leave-one-out: the frozen method on a copy of the pickles without those observations
-#                       (the optional sessions file restricts a MAHNOB-HCI copy to the sessions listed)
+#   no_of no_dof no_p1d no_torso
+#                       route exclusion: the frozen method on a copy of the bank's pickles without that
+#                       measurement route (no_of: OF; no_dof: DoF and the DoF bridge; no_p1d: P1D quadratic;
+#                       no_torso: torso displacement), with the priors of the full bank
 #
 # usage (from the repository root):
-#   estimate/materialize.sh <variant> <data dir> <priors csv> <out dir> <jobs> [sessions file]
-# <data dir> holds the pickles of observations/extract.py, <priors csv> is the group file of
-# estimate/reliability_priors.py. The pickles of the run are written to <out dir>/final/data.
+#   estimate/materialize.sh <variant> <data dir> <priors csv> <out dir> <jobs>
+# <data dir> holds the pickles of the bank (estimate/drop_observations.py bank applied to the pickles of
+# observations/extract.py), <priors csv> is the group file of estimate/reliability_priors.py computed on them.
+# The pickles of the run are written to <out dir>/final/data.
 set -e
-variant=$1; data=$2; priors=$3; out=$4; jobs=$5; sessions=$6
+variant=$1; data=$2; priors=$3; out=$4; jobs=$5
 script=estimate/multichannel_fusion.py
 flags=(--enable-observation-law --enable-rate-posterior --enable-target-observability-control
        --enable-signal-sqi-observability --rate-posterior-output-source final)
@@ -35,8 +37,8 @@ case $variant in
     python estimate/reliability_controls.py "$priors" "${variant%_readout}" "$out/priors_group.csv"
     priors=$out/priors_group.csv ;;
   equal_filter) script=estimate/equal_filter_trust.py ;;
-  no_*)
-    python estimate/leave_one_out_data.py "$data" "$out/data" "$variant" $sessions
+  no_of|no_dof|no_p1d|no_torso)
+    python estimate/drop_observations.py "$data" "$out/data" "$variant"
     data=$out/data ;;
   *) echo "unknown run: $variant" >&2; exit 1 ;;
 esac
