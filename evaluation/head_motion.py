@@ -11,7 +11,7 @@ Euclidean norm, in percent of the median face height; percentiles over detection
 from setting the range. Secondary measure: the mean speed of the centre after a 1-s moving average, in
 percent of the face height per second, with missed detections linearly interpolated. The share of
 samples without a detection is reported beside both, since a face lost during large motion shortens the
-range. Trials are those of the trial files given (a CSV with a trial column such as cohface_2_0 or mahnob_w2_<session>).
+range. Trials are those of the trial files given (a CSV with a trial column such as cohface_2_0 or mahnob_10).
 
 usage: head_motion.py <COHFACE folder> <MAHNOB-HCI folder> <track dir> <jobs> <trials csv> [<trials csv> ...] > head_motion_trials.csv
 """
