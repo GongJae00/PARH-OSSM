@@ -6,12 +6,10 @@ import numpy as np
 
 from tqdm import tqdm
 from observations.trial_io import (
-    _dataset_results_dir,
     _filter_valid_rois,
-    _merge_results_payload,
-    _method_suffix,
     _sanitize_run_label,
     derive_trial_identifiers,
+    write_trial_results,
 )
 
 def get_vid_stats(path):
@@ -24,23 +22,10 @@ def get_vid_stats(path):
     return count, fps
 
 def extract_respiration(datasets, methods, results_dir, run_label=None):
-    os.makedirs(results_dir, exist_ok=True)
-    method_order = [m.name for m in methods]
-    method_suffix = _method_suffix(methods)
-    sanitized_label = _sanitize_run_label(run_label) if run_label else None
-    single_dataset = len(datasets) == 1
+    data_dir = os.path.join(results_dir, _sanitize_run_label(run_label), 'data')
+    os.makedirs(data_dir, exist_ok=True)
 
     for dataset in datasets:
-        if sanitized_label:
-            if single_dataset:
-                dir_name = sanitized_label
-            else:
-                dir_name = f"{sanitized_label}_{dataset.name.upper()}"
-        else:
-            dir_name = f"{dataset.name.upper()}_{method_suffix}"
-        dataset_results_dir = _dataset_results_dir(results_dir, dir_name)
-        data_dir = os.path.join(dataset_results_dir, 'data')
-        os.makedirs(data_dir, exist_ok=True)
         if not getattr(dataset, 'data', None):
             dataset.load_dataset()
         # Loop over the dataset
@@ -185,5 +170,5 @@ def extract_respiration(datasets, methods, results_dir, run_label=None):
             d.pop('_obs_signal_cache', None)
             d['chest_rois'] = []
 
-            _merge_results_payload(outfilename, results_payload, method_order=method_order)
+            write_trial_results(outfilename, results_payload)
             tqdm.write('> Results updated!\n')
