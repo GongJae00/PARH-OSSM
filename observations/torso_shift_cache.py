@@ -1,13 +1,12 @@
-"""Compute the torso displacement observation (torso_shift in observations/chest_motion.py) for every trial, outside
-the dataset tree.
+"""Compute the torso displacement observation (torso_shift in observations/chest_motion.py) of every MAHNOB-HCI
+session, outside the dataset tree.
 
-The pipeline reads observation caches from the trial folder of the video, which for the original
-datasets is read-only; observations/run_shards.py copies obs_* files into its mirror folders, so the caches
-are written here as <out dir>/<dataset>_<trial>.npy and copied into the mirrors as obs_torso_shift.npy (--torso-cache).
-COHFACE is measured on the original data.avi, as in the reported runs, although the other observations read
-data.cfr.avi, its constant-frame-rate copy, which is one frame longer.
+The pipeline reads observation caches from the session folder of the video, which for the original dataset is
+read-only; observations/run_shards.py copies obs_* files into its mirror folders, so the caches are written here as
+<out dir>/mahnob_<session>.npy and copied into the mirrors as obs_torso_shift.npy (--torso-cache). COHFACE needs no
+cache: its torso displacement is computed inside the extraction, from data.cfr.avi like the other observations.
 
-usage: torso_shift_cache.py <MAHNOB|COHFACE> <dataset root> <out dir> [workers] [file of trial ids]
+usage: torso_shift_cache.py <MAHNOB-HCI root> <out dir> [workers] [file of session ids]
 """
 import glob
 import os
@@ -22,29 +21,22 @@ from observations.chest_motion import torso_shift
 from observations.run_shards import list_trials
 
 
-def video_path(dataset, folder):
-    if dataset == "MAHNOB":
-        return sorted(glob.glob(os.path.join(folder, "*.avi")))[0]
-    return os.path.join(folder, "data.avi")
-
-
 def write_cache(job):
-    dataset, folder, out_path = job
-    np.save(out_path, torso_shift(video_path(dataset, folder)).astype(np.float32))
+    folder, out_path = job
+    np.save(out_path, torso_shift(sorted(glob.glob(os.path.join(folder, "*.avi")))[0]).astype(np.float32))
     return out_path
 
 
 if __name__ == "__main__":
-    dataset, root, out_dir = sys.argv[1:4]
-    workers = int(sys.argv[4]) if len(sys.argv) > 4 else 8
-    trials = list_trials(dataset, root)
-    if len(sys.argv) > 5:
-        selected = set(open(sys.argv[5]).read().split())
+    root, out_dir = sys.argv[1:3]
+    workers = int(sys.argv[3]) if len(sys.argv) > 3 else 8
+    trials = list_trials("MAHNOB", root)
+    if len(sys.argv) > 4:
+        selected = set(open(sys.argv[4]).read().split())
         trials = [t for t in trials if t in selected]
     os.makedirs(out_dir, exist_ok=True)
-    jobs = [(dataset, os.path.join(root, t), os.path.join(out_dir, f"{dataset.lower()}_{t.replace('/', '_')}.npy"))
-            for t in trials]
-    jobs = [job for job in jobs if not os.path.exists(job[2])]
+    jobs = [(os.path.join(root, t), os.path.join(out_dir, f"mahnob_{t}.npy")) for t in trials]
+    jobs = [job for job in jobs if not os.path.exists(job[1])]
     cv2.setNumThreads(1)
     with Pool(workers) as pool:
         for _ in pool.imap(write_cache, jobs):

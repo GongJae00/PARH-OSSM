@@ -8,8 +8,9 @@ usage (from the repository root):
 <dataset folder> is read only. Each shard mirrors its trials under <work>/shard_NN/data: recordings are symlinked,
 and the observation caches (obs_*) are copied, because extract.py loads them from, and writes new ones into,
 the trial folder. --no-caches mirrors only the video and the belt, so every observation is computed from the video.
---torso-cache names a folder of <dataset>_<trial>.npy torso displacement signals (observations/torso_shift_cache.py),
-copied into each mirror as obs_torso_shift.npy. A trial id is <subject>/<trial> for COHFACE and the session id for
+--torso-cache names a folder of mahnob_<session>.npy torso displacement signals (observations/torso_shift_cache.py),
+copied into each mirror as obs_torso_shift.npy; the MAHNOB-HCI extraction takes it, the COHFACE one computes the torso
+displacement itself. A trial id is <subject>/<trial> for COHFACE and the session id for
 MAHNOB. The pickles of all shards are linked into <work>/data, the folder estimate/ reads.
 """
 import argparse
