@@ -18,8 +18,10 @@ oscillation it appears to carry.
 
 <br>
 <p align="center"><img src="figures/F1_architecture.png" width="100%"></p>
-<p align="center"><sub><b>Figure 1.</b> PARH-OSSM: the nine video-derived observations, the reliability-weighted
-observation law, the state-space model, and the separate rate and waveform outputs.</sub></p>
+<p align="center"><sub><b>Figure 1.</b> PARH-OSSM. The nine observations form the observation vector of a Kalman
+filter (d), and the trust of each observation divides its noise variance, so that a less trusted observation moves
+the state less. The state (e) holds the breathing oscillation, its second harmonic, a slow baseline, and an
+aperiodic residual.</sub></p>
 <br>
 
 1. **Observations.** Each observation reads the movement through a different image cue and so adds its own error.
