@@ -1,34 +1,47 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite the paper and archived software release."
-title: "ResPyre: PARH-OSSM framework for camera-derived respiratory motion"
+message: "If you use this code, please cite the article below and the archived release."
+title: "PARH-OSSM: video-based respiratory rate estimation via reliability-weighted multichannel state-space fusion"
 type: software
 authors:
   - family-names: Cho
     given-names: Young-Jae
     affiliation: "University of Ulsan"
   - family-names: Kim
+    given-names: Do-Yup
+    affiliation: "Incheon National University"
+  - family-names: Kim
     given-names: Dae-Yeol
     affiliation: "University of Ulsan"
-repository-code: "https://github.com/GongJae00/resPyre"
-url: "https://github.com/GongJae00/resPyre"
+  - family-names: Kim
+    given-names: Youngjun
+    affiliation: "Changwon National University"
+repository-code: "https://github.com/GongJae00/PARH-OSSM"
 license: GPL-3.0-only
 version: "1.0.0"
-date-released: "2026-05-21"
-abstract: "ResPyre provides the PARH-OSSM implementation, fixed camera-motion observation operators, and evaluation scripts used for the physiology-aligned state-space decomposition study of camera-derived respiratory motion."
+abstract: "Code of the article: the nine video-motion observations of the chest and upper torso, the PARH-OSSM multichannel oscillator state-space filter, its comparison methods, and the scripts that produce every reported table and figure on COHFACE and MAHNOB-HCI."
 keywords:
   - contactless respiration
-  - camera-derived motion
+  - respiratory rate
+  - video motion
   - state-space model
-  - respiratory waveform
-  - observability
+  - Kalman filter
+references:
+  - type: software
+    title: "resPyre"
+    url: "https://github.com/phuselab/resPyre"
+    license: GPL-3.0
+    notes: "The OF, DoF, and P1D observation operators originate in resPyre."
 preferred-citation:
   type: article
-  title: "A Physiology-Aligned State-Space Decomposition Framework for Camera-Derived Respiratory Motion"
+  title: "Video-Based Respiratory Rate Estimation via Reliability-Weighted Multichannel State-Space Fusion"
   authors:
     - family-names: Cho
       given-names: Young-Jae
-      affiliation: "University of Ulsan"
+    - family-names: Kim
+      given-names: Do-Yup
     - family-names: Kim
       given-names: Dae-Yeol
-      affiliation: "University of Ulsan"
+    - family-names: Kim
+      given-names: Youngjun
+  journal: "Scientific Reports"
   year: 2026

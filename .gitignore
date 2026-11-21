@@ -1,100 +1,12 @@
-# ============================================
-# resPyre .gitignore — PARH-OSSM project
-# ============================================
-
-# --- Python bytecode / build ---
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-*.egg-info/
-*.egg
-build/
-dist/
-*.whl
-
-# --- Environments ---
+.pytest_cache/
 .venv/
-.env
-venv/
-env/
-
-# --- IDE / editor ---
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# --- Claude Code ---
 .claude/
 
-# --- Test / coverage ---
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-
-# --- LaTeX build artifacts (intermediate only) ---
-paper/*.aux
-paper/*.bbl
-paper/*.blg
-paper/*.log
-paper/*.out
-paper/*.fls
-paper/*.fdb_latexmk
-paper/*.synctex.gz
-*.aux
-*.blg
-*.out
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-*.toc
-!paper/main.bbl
-
-# --- Local manuscript workspace ---
+# private: manuscript drafts, lab work, and run outputs
 paper/
-paper/generated/
-paper/tmp/
-submission_package/
-submission_support/
-
-# --- Generated analysis artifacts ---
-analysis/*
-!analysis/
-!analysis/publication_figure_manifest.json
-
-# --- Results (large data: PKL, NPZ, plots) ---
+lab/
 results/
-results_*.zip
-**/obs_*.npy
-**/obs_roi_stats_v1.npz
-
-# --- Local dataset links / raw data ---
-dataset/*
-!dataset/
-!dataset/README_dataset.md
-
-# --- Logs ---
-logs/
+*.pkl
 *.log
-!paper/*.tex
-
-# --- Large reference PDFs ---
-paper/s41598-*.pdf
-mainko.*
-paper/main_ko.*
-paper/figures/*_draft_source.png
-
-# --- Prompt scratch files ---
-goal.md
-scripts/legacy/
-prompt*.md
-feedbackprompt*.md
-tmp_*.sh
-.tmp_*/
-
-# --- OS files ---
-.DS_Store
-Thumbs.db

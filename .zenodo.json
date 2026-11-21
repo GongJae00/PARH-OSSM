@@ -1,33 +1,19 @@
 {
-  "title": "ResPyre: PARH-OSSM framework for camera-derived respiratory motion",
+  "title": "PARH-OSSM: video-based respiratory rate estimation via reliability-weighted multichannel state-space fusion",
   "upload_type": "software",
-  "description": "Paper-submission release of ResPyre, including the PARH-OSSM implementation, fixed camera-motion observation operators, paper-facing evaluation scripts, figure/table generation scripts, and verification audits used for the physiology-aligned state-space decomposition study of camera-derived respiratory motion. Raw third-party video and physiology datasets are not redistributed.",
+  "description": "Code of the article \"Video-Based Respiratory Rate Estimation via Reliability-Weighted Multichannel State-Space Fusion\" (Scientific Reports): the nine video-motion observations of the chest and upper torso, the PARH-OSSM multichannel oscillator state-space filter, its comparison methods, and the scripts that produce every reported table and figure on COHFACE and MAHNOB-HCI. The OF, DoF, and P1D observation operators originate in resPyre (https://github.com/phuselab/resPyre, GPL-3.0). The COHFACE and MAHNOB-HCI recordings are not redistributed.",
   "creators": [
-    {
-      "name": "Cho, Young-Jae",
-      "affiliation": "University of Ulsan"
-    },
-    {
-      "name": "Kim, Dae-Yeol",
-      "affiliation": "University of Ulsan"
-    }
+    {"name": "Cho, Young-Jae", "affiliation": "University of Ulsan"},
+    {"name": "Kim, Do-Yup", "affiliation": "Incheon National University"},
+    {"name": "Kim, Dae-Yeol", "affiliation": "University of Ulsan"},
+    {"name": "Kim, Youngjun", "affiliation": "Changwon National University"}
   ],
   "access_right": "open",
   "license": "gpl-3.0-only",
-  "version": "1.0.0-paper-submission",
-  "publication_date": "2026-05-21",
-  "keywords": [
-    "contactless respiration",
-    "camera-derived motion",
-    "state-space model",
-    "respiratory waveform",
-    "observability"
-  ],
+  "version": "1.0.0",
+  "keywords": ["contactless respiration", "respiratory rate", "video motion", "state-space model", "Kalman filter"],
   "related_identifiers": [
-    {
-      "identifier": "https://github.com/GongJae00/resPyre",
-      "relation": "isSupplementTo",
-      "scheme": "url"
-    }
+    {"identifier": "https://github.com/GongJae00/PARH-OSSM", "relation": "isSupplementTo", "scheme": "url"},
+    {"identifier": "https://github.com/phuselab/resPyre", "relation": "isDerivedFrom", "scheme": "url"}
   ]
 }
