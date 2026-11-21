@@ -11,7 +11,7 @@
 #   evaluation/motion_perturbation.sh <COHFACE folder> <priors csv of the unperturbed run> <work dir> <records dir> <jobs> <kind>:<level> ...
 set -e
 source=$1; priors=$2; root=$3; records=$4; jobs=$5; shift 5
-config=configs/cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons_first_frame_roi.json
+config=configs/cohface_first_frame_roi.json
 trials=($(cat evaluation/cohface_perturbation_trials.txt))
 mkdir -p "$records"
 

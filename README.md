@@ -1,384 +1,112 @@
-# ResPyre
+<h1 align="center">Video-Based Respiratory Rate Estimation via<br>Reliability-Weighted Multichannel State-Space Fusion</h1>
 
-ResPyre is a research-oriented framework for contactless respiration estimation from video.
-The codebase is organized around two layers:
+<p align="center">
+Young-Jae Cho<sup>1,†</sup>, Do-Yup Kim<sup>2,†</sup>, Dae-Yeol Kim<sup>1,&#42;</sup>, Youngjun Kim<sup>3,&#42;</sup><br>
+<sup>1</sup>University of Ulsan &nbsp; <sup>2</sup>Incheon National University &nbsp; <sup>3</sup>Changwon National University<br>
+<sup>†</sup>Equal contribution &nbsp; <sup>&#42;</sup>Corresponding authors<br>
+<i>Scientific Reports</i>, in revision
+</p>
 
-- `components/`: dataset adapters, observation extractors, oscillator heads
-- `core/`: pipeline orchestration, evaluation, visualization, metadata/reporting
+## What the code computes
 
-The current repository is centered on chest-motion respiration experiments and
-the Base, OSSM-KF, and PARH-OSSM comparison workflow. Use `execute.md` for the
-full reproduction ledger.
+Breathing moves the chest and shoulders by about a pixel in an ordinary video, and that movement reaches the camera
+mixed with head and posture motion, changes of illumination, and sensor noise. This code estimates the respiratory
+rate and a respiratory waveform from such video without a contact sensor. It reads the movement through nine
+observations, each a different measurement of the same displacement, and estimates one latent breathing oscillation
+from all of them with a state-space filter, PARH-OSSM, which weights each observation by how much of that
+oscillation it appears to carry.
 
-## What Is In Scope
+<br>
+<p align="center"><img src="figures/F1_architecture.png" width="100%"></p>
+<p align="center"><sub><b>Figure 1.</b> PARH-OSSM: the nine video-derived observations, the reliability-weighted
+observation law, the state-space model, and the separate rate and waveform outputs.</sub></p>
+<br>
 
-- Datasets: `COHFACE`, `MAHNOB-HCI`, plus V4V/SCAMPS as weak external evidence in `execute.md`
-- Base observation methods: `of_farneback`, `of_disp_bridge`, `dof`, `dof_disp_bridge`, `profile1d_linear`, `profile1d_quadratic`, `profile1d_cubic`, `profile1d_consensus`
-- Oscillator-wrapped methods via `<base>__<head>` naming
-- Publicly documented heads: `kfstd` (`OSSM-KF` comparator), `parh_ossm`, `simple_bandpass`
-- Compatibility head: `narossm`
-- End-to-end steps from one CLI: `estimate`, `evaluate`/`metrics`, `eda`, `visualize`, `metadata`
+1. **Observations.** Each observation projects the chest displacement in its own way. Optical flow (OF) measures the
+   vertical velocity of the chest region, the difference of frames (DoF) counts the pixels whose brightness
+   changes, the one-dimensional profile observations (P1D) measure the vertical shift of a row-intensity profile,
+   and torso displacement measures the position of the upper body in a box below the face. Each therefore adds its
+   own bias, such as harmonics of the breath, drift, or head motion, and its own noise.
+2. **Estimation.** The state of the filter is one oscillation with its second harmonic, a baseline drift, and an
+   aperiodic residual, and every observation is a noisy view of that state. A trust computed from the video alone,
+   from the filter's innovations, the agreement between observations, and their signal quality, sets the
+   measurement variance of each observation in the Kalman filter and the Rauch–Tung–Striebel smoother. A readout
+   turns the smoothed state into a rate track and a waveform. No step reads the respiratory belt at inference.
+3. **Evaluation.** The rate is scored in 30-s windows under three definitions of the belt's rate (Hilbert, Welch,
+   and breath count), against methods that read the same nine observations and against a constant predictor that
+   outputs the typical rate of the cohort. The waveform is scored by its concordance with the belt within ±2 s,
+   against the belts of other participants and against phase-randomized copies of the trial's own belt. COHFACE
+   was used to build the method. MAHNOB-HCI participants were split into 9 development and 18 test participants,
+   and the test participants were scored once, after the method was fixed.
 
-The stable config examples currently in the repo:
+## Layout
 
-- `configs/cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons.json`
-- `configs/mahnob_parh_ossm_prod_ofbridge_dofbridge_p1dcons.json`
+The folders follow the computation, from video to the reported tables.
 
-The full validation path is driven by `execute.md`, because it also wires
-target-side priors, the adaptive observation law, and post-run diagnostics.
-
-## Citation and Archival Release
-
-Citation metadata is provided in `CITATION.cff`, and Zenodo release metadata is
-provided in `.zenodo.json`. Cite the archived software release together with the
-accompanying paper.
-
-## Repository Layout
-
-```text
-resPyre/
-├── components/
-│   ├── datasets/          # Dataset loaders and ROI extraction entry points
-│   ├── observations/      # Base motion / profile observation methods
-│   └── models/
-│       ├── core/          # Shared oscillator parameters and base helpers
-│       └── heads/         # OSSM-KF, PARH-OSSM, and other oscillator heads
-├── core/
-│   ├── evaluation/        # Metrics, plotting, frame-log utilities
-│   ├── pipeline/          # Runner, wrapper, evaluation, visualization, metadata
-│   └── utils/             # Config loader and shared utilities
-├── configs/               # Experiment configs
-├── dataset/               # Public dataset notes
-├── paper/                 # Local manuscript workspace, ignored by Git
-├── results/               # Generated run artifacts, ignored by Git
-├── setup/                 # Environment bootstrap
-├── tests/                 # Regression and pipeline tests
-├── execute.md             # Reproduction ledger
-└── main.py                # Primary CLI entry point
+```
+observations/   video → chest ROI and torso box → the nine observations
+estimate/       OSSM-KF, PARH-OSSM, reliability priors, stage and control variants
+evaluation/     belt references, window rates, tests, waveform agreement, table rows
+figures/        the figure scripts of the article
+configs/        extraction settings of each dataset
+tests/          tests that pin the filters, the reference rates, and the controls
 ```
 
-## Installation
-
-`setup/setup.sh` creates a minimal environment for the motion and oscillator stack.
-
-```bash
-./setup/setup.sh -n resPyre --verify
-conda activate resPyre
-```
-
-Installed dependencies include NumPy/SciPy/Pandas/Matplotlib/HDF5 plus the motion stack
-(`opencv`, `mediapipe`, `scikit-image`, `plotly`, `optuna`).
-
-Additional setup notes are in `setup/README_setup.md`.
-
-## Dataset Root
-
-By default, dataset loaders read from:
-
-```text
-<repo>/dataset
-```
-
-To use another dataset root, set:
-
-```bash
-export RESPIRE_DATA_DIR=/path/to/datasets
-```
-
-The expected local dataset subdirectories are:
-
-- `dataset/BP4Ddef`
-- `dataset/COHFACE`
-- `dataset/MAHNOB`
-- `dataset/V4V`
-- `dataset/SCAMPS`
-
-Raw datasets and local symlinks are intentionally ignored by Git. The tracked
-`dataset/` directory contains only dataset instructions.
-
-## Quick Start
-
-Run a stable config:
-
-```bash
-python main.py --config configs/cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons.json
-python main.py --config configs/mahnob_parh_ossm_prod_ofbridge_dofbridge_p1dcons.json
-```
-
-Run only the first sample from each configured dataset:
-
-```bash
-python main.py --config configs/cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons.json --debug
-```
-
-Override the results root at runtime:
-
-```bash
-python main.py \
-  --config configs/cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons.json \
-  --results /tmp/respyre_runs
-```
-
-CLI options currently exposed by `main.py`:
-
-- `--config, -c`: config JSON path
-- `--results, -r`: results directory override
-- `--debug`: limit each dataset to one sample
-
-## Config Model
-
-Configs are loaded through `core/utils/config.py`.
-Relative `results_dir` values are resolved relative to the project root, not the config file directory.
-
-A minimal config looks like this:
-
-```json
-{
-  "name": "cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons",
-  "results_dir": "results/cohface_parh_ossm_prod_ofbridge_dofbridge_p1dcons",
-  "datasets": [
-    {
-      "name": "COHFACE",
-      "roi": {
-        "chest": {
-          "mp_complexity": 1,
-          "skip_rate": 10
-        }
-      }
-    }
-  ],
-  "methods": [
-    "of_farneback",
-    {
-      "name": "of_farneback__parh_ossm",
-      "params": {
-        "oscillator": {
-          "no_autotune": true,
-          "em_mode": "off",
-          "rv_auto": false,
-          "rv_floor": 0.05,
-          "qx": 0.005,
-          "tau_env": 30.0,
-          "post_smooth_alpha": 0.88
-        }
-      }
-    }
-  ],
-  "preproc": {
-    "robust_zscore": {
-      "enabled": true,
-      "clip": 5.0
-    }
-  },
-  "eval": {
-    "win_size": 30,
-    "stride": 1,
-    "min_hz": 0.08,
-    "max_hz": 0.5
-  },
-  "steps": ["estimate", "metrics", "metadata"]
-}
-```
-
-Key conventions:
-
-- `datasets` entries can be strings or dicts
-- `methods` entries can be strings or dicts
-- Wrapped methods use `<base>__<head>`
-- Method-level oscillator overrides can be passed under `params.oscillator`
-- Global oscillator defaults live in the top-level `oscillator` block
-- Supported step labels are `estimate`, `evaluate`, `metrics`, `eda`, `visualize`, `metadata`
-
-## Execution Flow
-
-### 1. Config load
-
-`main.py` loads the config, normalizes dataset/method entries, resolves `results_dir`,
-builds dataset objects, and instantiates methods.
-
-### 2. Estimation
-
-`core/pipeline/runner.py` loops over each trial and each method:
-
-- dataset loader provides video path and ground truth
-- ROI extraction is triggered lazily per region
-- base observation methods produce a 1D respiratory proxy
-- wrapped methods forward that proxy into an oscillator head
-- results are merged into one per-trial pickle under `data/`
-
-For wrapped methods, `core/pipeline/wrapped_method.py` also attaches:
-
-- ROI-derived quality metadata
-- method/config metadata
-- optional cache-based observation loading
-- optional per-method `.npz` payloads under `aux/`
-
-### 3. Evaluation
-
-`core/pipeline/evaluation_step.py` computes four artifact groups:
-
-- time-domain metrics: waveform fidelity on aligned normalized signals
-- frequency-domain metrics: windowed RPM accuracy and spectral-shape statistics
-- filter diagnostics: NIS/failure/calibration summaries from frame logs
-- waveform comparison metrics: unified output comparison for Base, OSSM-KF, and PARH workflows
-
-Evaluation settings are persisted to `metrics/eval_settings.json`.
-
-### 4. Optional EDA / visualization
-
-If requested in `steps`, the pipeline can also run:
-
-- `eda`: innovation/frame-log exploratory summaries
-- `visualize`: PNG plots for summary metrics, overlays, traces, and diagnostics
-
-### 5. Metadata and run status
-
-Run bookkeeping is handled in `core/pipeline/metadata_step.py`.
-Each run directory receives `run_status.json`, and `metadata.json` is emitted even when
-the pipeline fails part-way through.
-
-## PARH-OSSM Validation Path
-
-The final validation path is:
-
-```text
-fixed observation classes
--> adaptive observation law
--> PARH-OSSM state-space update
--> bounded z_osc rate readout
--> z_full waveform diagnostics
-```
-
-`OSSM-KF` is a comparator and external timing-evidence source in the final
-materialization command. It is not a nested fallback that replaces PARH-OSSM.
-Run the commands in `execute.md` to regenerate the current COHFACE and MAHNOB
-tail-aligned validation bundles and post-run diagnostics. Manuscript source and
-rendered paper files live in the local `paper/` workspace and are not tracked in
-this repository.
-
-## Publication Figure Regeneration
-
-The public repository includes the reproducible figure-production pipeline used
-for the PARH-OSSM manuscript. The manuscript workspace itself (`paper/`) and
-rendered outputs remain ignored by Git, but the scripts can regenerate every
-publication figure except Figure 1 from the released result artifact bundle.
-
-Set the path to the result artifact zip:
-
-```bash
-export RESPYRE_RESULTS_ZIP=/path/to/results_20260613.zip
-```
-
-Audit the expected inputs and outputs:
-
-```bash
-python scripts/make_publication_figures.py --audit
-```
-
-Regenerate all redesigned manuscript and supplementary figures except Figure 1:
-
-```bash
-python scripts/make_publication_figures.py --all
-```
-
-The command writes vector PDFs, SVG files, and 600 dpi PNG previews under
-`paper/figures/`, and records the expected outputs in
-`analysis/publication_figure_manifest.json`. To verify the generated figure
-files:
-
-```bash
-python scripts/verify_publication_figures.py
-```
-
-The figure code is organized under `paperfig/`:
-
-- `paperfig/style.py`: shared journal-style visual defaults and export helpers
-- `paperfig/io.py`: zip-backed artifact reader
-- `paperfig/panels.py`: reusable dot plot, dumbbell, and heatmap panels
-- `paperfig/waveforms.py`: waveform-windowing and overlay helpers
-
-The pipeline is intentionally data-preserving: it does not change reported
-metrics, trial definitions, statistical tests, or manuscript conclusions.
-
-## Results Layout
-
-Single-dataset runs normally resolve to:
-
-```text
-results/<name>/
-```
-
-Multi-dataset runs resolve to:
-
-```text
-results/<name>_<DATASET>/
-```
-
-Typical contents:
-
-```text
-results/<run>/
-├── data/                         # per-trial merged pickle payloads
-├── aux/                          # optional method-specific npz/frame-log artifacts
-├── metrics/
-│   ├── eval_settings.json
-│   ├── metrics_time_domain_raw.csv
-│   ├── metrics_freq_domain_raw.csv
-│   ├── metrics_filter_diagnostics_raw.csv
-│   ├── metrics_waveform_raw.csv
-│   └── *_summary.txt / *.pkl / *.csv
-├── plots/                        # visualization outputs when enabled
-├── logs/
-│   ├── config_usage.json
-│   ├── method_quality.csv
-│   ├── method_quality_summary.json
-│   └── frame_log_manifest.json
-├── metadata.json
-└── run_status.json
-```
-
-Each `data/*.pkl` file contains shared trial metadata plus an `estimates` list for all
-methods run on that trial.
-
-## PARH-OSSM Notes
-
-`components/models/heads/parh_ossm.py` implements the current PARH-OSSM head.
-
-Current behavior:
-
-- the primary packaged `signal_hat` is the smoothed oscillatory reconstruction
-- PARH additionally stores `z_osc`, `z_full`, causal/smoothed variants, decomposition terms, and diagnostic arrays
-- waveform comparison code treats `z_full` as the main PARH waveform output
-
-## Extending The Framework
-
-### Add a dataset
-
-1. Create a new dataset class under `components/datasets/`
-2. Inherit from `DatasetBase`
-3. Implement `load_dataset()`, `load_gt()`, and `extract_ROI()`
-4. Register or import it where needed in `main.py`
-
-### Add an oscillator head
-
-1. Create a new head under `components/models/heads/`
-2. Inherit from `_BaseOscillatorHead`
-3. Implement `run(signal, fs, meta=None)`
-4. Register it in `components/models/__init__.py`
-5. Use it from config via `<base>__<head>`
-
-## Verification
-
-Basic CLI check:
-
-```bash
-python main.py --help
-```
-
-Run the regression suite:
-
-```bash
-pytest -q
-```
-
-If you only want to validate a config wiring path, use `--debug` for a quick wiring check.
+| In the article | Code |
+|---|---|
+| Video-derived observations | `observations/chest_roi.py`, `chest_motion.py`, `observation_signals.py` |
+| State-space model, observation law | `estimate/parh_ossm.py`, `multichannel_fusion.py` |
+| Reliability priors | `estimate/reliability_priors.py` |
+| OSSM-KF | `estimate/ossm_kf.py` |
+| Stages and controls | `estimate/materialize.sh` (one variant per run) |
+| Hilbert, Welch, and breath-count references | `evaluation/belt_reference.py`, `rate_tracks.py` |
+| Tables 2 and 3 | `evaluation/main_tables.sh`, `main_tables.py` |
+| Table 4, waveform agreement | `evaluation/bounded_lag_waveform.py`, `phase_randomized_null.py`, `onset_alignment_waveform.py`, `waveform_table.py` |
+| Figure 2 | `figures/case_figure.py` |
+| Confirmatory tests | `evaluation/confirmatory_test.py`, `mahnob_test_scores.sh` |
+| Agreement across trials | `evaluation/rate_agreement.py`, `stage_slopes.py`, `observation_track_slope.py`, `figures/rate_agreement_figure.py` |
+| Error under motion | `evaluation/head_motion.py`, `motion_tertiles.py`, `motion_perturbation.sh` |
+| Supplementary tables | `evaluation/supplementary_tables.py`, `parameter_table.py` |
+
+## Running
+
+The code runs on Python 3.10 with the packages in `requirements.txt`. COHFACE
+(<https://www.idiap.ch/en/scientific-research/data/cohface>) and MAHNOB-HCI (<https://mahnob-db.eu/>) are obtained
+from their providers under their access terms and are not redistributed here. From the repository root, the
+COHFACE result of PARH-OSSM is reproduced in four steps:
+
+1. Extract the nine observations from the videos:
+   ```
+   python observations/run_shards.py --dataset COHFACE --dataset-root <COHFACE folder> \
+       --config configs/cohface_first_frame_roi.json --work <work dir> --shards 8
+   ```
+2. Fit the reliability priors on the observations:
+   ```
+   python estimate/reliability_priors.py --data-dir <work dir>/data --dataset-label COHFACE \
+       --out-edge <priors dir>/edges.csv --out-group <priors dir>/group.csv \
+       --out-summary <priors dir>/summary.csv --window-sec 30 --window-stride-sec 10 --jobs 8
+   ```
+3. Run PARH-OSSM with the reported settings (`frozen`) and the four stages of Table 3:
+   ```
+   for run in frozen plain_multichannel readout observation_law observability; do
+       estimate/materialize.sh $run <work dir>/data <priors dir>/group.csv <runs dir>/$run 8
+   done
+   ```
+4. Compute the window rates and the rows of Tables 2 and 3:
+   ```
+   evaluation/window_rates.sh cohface <work dir>/data <runs dir> <records dir> 8 - \
+       frozen plain_multichannel readout observation_law observability
+   evaluation/bank_rates.sh cohface <work dir>/data <records dir> 8
+   evaluation/main_tables.sh <records dir> cohface > table_rows.tex
+   ```
+   The row of PARH-OSSM on the eight chest observations needs one more run, `chest_only`, made as the header of
+   `evaluation/main_tables.sh` describes; the controls and leave-one-out runs are listed in
+   `estimate/materialize.sh`.
+
+`python -m pytest` runs the tests.
+
+## Credits
+
+The OF, DoF, and P1D observation operators originate in resPyre (<https://github.com/phuselab/resPyre>), described in
+Boccignone et al., *Remote Respiration Measurement with RGB Cameras: A Review and Benchmark*, ACM Computing Surveys
+58(5), 2025. Like resPyre, this code is released under the GNU General Public License v3.0.
