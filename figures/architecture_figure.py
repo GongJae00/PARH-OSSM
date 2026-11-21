@@ -1,20 +1,22 @@
-"""Figure 1: the pipeline of PARH-OSSM, drawn at the text width of the article (175.9 mm) so that LaTeX does not
-scale it.
+"""Figure 1: PARH-OSSM as a stack of stages on one time axis, drawn at the text width of the article (175.9 mm) so
+that LaTeX does not scale it.
 
-The photographs and the observation thumbnails are raster crops of the nine-observation version of the submitted
-figure (the frame of panel a is the frame of panel b, without the boxes drawn on it); the boxes, the shoulder points,
-the traces, the diagrams, and all text are drawn here. Panel c shows the five observations of the bank, one for each
-image measurement (Methods); P1D is drawn as what it computes: the cross-correlation of consecutive profiles at
-integer lags, interpolated quadratically (scipy interp1d, as in observations/chest_motion.py), with the refined peak
-marked. Panel b places the boxes as the
-nine-observation figure placed them: the chest ROI centred on the shoulders and as wide as their span, the torso box
-below the face down to the bottom of the frame. The traces under the thumbnails and the outputs are one COHFACE trial,
-the observations band-passed to 0.08-0.5 Hz from 2 s on and scaled by their median absolute deviation as in Figure 2.
-Panel d draws the observation law of Methods: the five observations form the observation vector, and the trust of
-each observation divides its noise variance, so that it never weights a sum of the observations.
+Left column. (a) Where the observations are measured: breathing moves the upper torso vertically; the chest strip
+sits on the shoulder line of the first frame (as wide as the shoulder span, 0.2 span high) and the torso box below
+the face. The body is an outline, not a photograph. (c) The state-space model; the node x_t is joined to the
+stack of smoothed state components on the right.
+Right column, one stack on one time axis. (b) The observations of one trial, band-passed to 0.08-0.5 Hz and displayed
+as in Figure 2 (figure_style.draw_trace), each over its share of the Kalman update, w_k = (1 / R_eff,k) /
+sum_j (1 / R_eff,j), from R_eff_t_channels of the run; the share, not the trust pi alone, is what weights an
+observation, because a transient that breaks an observation raises its innovation variance and so its R_eff.
+(c) The RTS-smoothed state components (decomposition of the run), on the scale of the fundamental. (d) The rate
+track (window rates, plotted at the window centre) and the smoothed waveform. One light guide marks the transient,
+the time of the largest median over the observations of |z|. Every trace is the stored output of the bank's run;
+nothing is fitted here.
 
-usage: architecture_figure.py <nine-observation figure png> <observation pkl> <final pkl> <window rates csv> <out.pdf>
+usage: architecture_figure.py <observation pkl> <final pkl> <window rates csv> <out.pdf>
 """
+import json
 import os
 import pickle
 import sys
@@ -23,237 +25,221 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Rectangle
-from PIL import Image
-from scipy.interpolate import interp1d
+from matplotlib.patches import Circle, Ellipse, FancyArrowPatch, FancyBboxPatch, PathPatch, Rectangle
+from matplotlib.path import Path
 from scipy.signal import butter, sosfiltfilt
 
 matplotlib.use("pdf")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from figure_style import INK, MM, NEUTRAL, PARH  # noqa: E402
+from figure_style import (CHEST, GUIDE, INK, MM, NEUTRAL, OBS, PARH, TORSO, draw_share, draw_trace, lighter,  # noqa: E402
+                          median_z)
 
 plt.rcParams.update({"mathtext.fontset": "custom", "mathtext.rm": "Liberation Sans",
                      "mathtext.it": "Liberation Sans:italic", "mathtext.bf": "Liberation Sans:bold"})
 
-source_png, observation_pkl, final_pkl, rates_csv, out_pdf = sys.argv[1:6]
-WIDTH, HEIGHT = 175.9, 80.0
-# (method, label, tile of the nine-observation figure); P1D is drawn, not cropped
-OBSERVATIONS = [("of_farneback", "OF", 0), ("DoF", "DoF", 2), ("dof_disp_bridge", "DoF bridge", 3),
-                ("profile1D quadratic", "P1D", None), ("torso_shift", "Torso displacement", 8)]
-CHEST, TORSO, FRAME, BLOCK = "#d1342f", "#93479b", "#c8c8c8", "#a0a0a0"
-TRACE_SPAN_S, BAND_HZ, SKIP_S = (5, 50), (0.08, 0.5), 2
-
-# raster sources, in pixels of the nine-observation figure
-figure = np.array(Image.open(source_png).convert("RGB"))
-frame = figure[58:255, 74:348]
-tiles = [(954, 1186, 135, 321), (1213, 1445, 138, 323), (1472, 1704, 137, 322), (1732, 1964, 138, 321),
-         (1991, 2223, 131, 316), (2250, 2482, 132, 317), (2509, 2741, 132, 317), (2769, 3001, 129, 315),
-         (3028, 3260, 129, 315)]                                         # x0, x1, y0, y1 of each tile frame
-CHEST_BOX, TORSO_BOX = (66, 131, 210, 163), (52, 124, 219, 196)        # x0, y0, x1, y1 in frame pixels
-
-
-def thumbnail(x0, x1, y0, y1, photograph=False):
-    """The content of one observation tile without its frame, the cream fill around a drawn tile set to white."""
-    tile = figure[y0 + 11:y1 - 11, x0 + 11:x1 - 11].astype(int)
-    content = np.abs(tile - [253, 248, 238]).sum(2) > 30
-    content &= np.abs(tile - [255, 255, 255]).sum(2) > 30
-    rows, cols = np.nonzero(content)
-    tile = tile[rows.min():rows.max() + 1, cols.min():cols.max() + 1]
-    edge = lambda line: ((line.min(-1) > 150) & (line.min(-1) <= 228)).mean() > 0.3   # a light canvas border
-    while not photograph and edge(tile[0]):
-        tile = tile[1:]
-    while not photograph and edge(tile[-1]):
-        tile = tile[:-1]
-    if not photograph:
-        tile[(np.abs(tile - [253, 248, 238]).sum(2) < 30) | (tile.min(2) > 228)] = 255
-    return tile.astype(np.uint8)
-
-
-def correlation_icon(x0, y0, width, height, kind):
-    """Cross-correlation samples at integer lags (grey), their interpolation (ink), and the refined peak."""
-    lags = np.arange(-3, 4)
-    samples = np.exp(-0.5 * ((lags - 0.42) / 1.1) ** 2)
-    fine = np.linspace(-3, 3, 601)
-    curve = interp1d(lags, samples, kind)(fine)
-    icon = mini_axes(x0, y0, x0 + width, y0 + height)
-    icon.plot(fine, curve, color=INK, lw=0.5)
-    icon.plot(lags, samples, "o", ms=1.5, mfc="white", mec=NEUTRAL, mew=0.5)
-    icon.plot([fine[curve.argmax()]] * 2, [-0.15, curve.max()], color=INK, lw=0.4)
-    icon.set(xlim=(-3.4, 3.4), ylim=(-0.15, 1.18), xticks=[], yticks=[])
-    for spine in icon.spines.values():
-        spine.set(color=FRAME, lw=0.5)
-
-
-def scaled_trace(x, fps):
-    x = np.asarray(x, float).reshape(-1)[int(SKIP_S * fps):]
-    x = sosfiltfilt(butter(2, BAND_HZ, btype="band", fs=fps, output="sos"), x)
-    z = (x - np.median(x)) / (1.4826 * np.median(np.abs(x - np.median(x))))
-    time = SKIP_S + np.arange(x.size) / fps
-    keep = (time >= TRACE_SPAN_S[0]) & (time <= TRACE_SPAN_S[1])
-    return (time[keep] - TRACE_SPAN_S[0]) / (TRACE_SPAN_S[1] - TRACE_SPAN_S[0]), 3 * np.tanh(z[keep] / 3) / 3
-
+observation_pkl, final_pkl, rates_csv, out_pdf = sys.argv[1:5]
+WIDTH = 175.9
+SPAN_S, BAND_HZ, TICKS_S = (5.0, 50.0), (0.08, 0.5), [10, 20, 30, 40, 50]
+OUTLINE = "#b5b5b5"
+# observation family of the run -> (label, label in the model diagram, colour of the region it reads)
+FAMILIES = {"of_farneback": ("OF", "OF", CHEST), "profile1d_quadratic": ("P1D", "P1D", CHEST),
+            "torso_shift": ("Torso displacement", "Torso disp.", TORSO)}
+SIGNAL_OF = {"of_farneback": "of_farneback", "profile1d_quadratic": "profile1D quadratic",
+             "torso_shift": "torso_shift"}
+COMPONENTS = [("h1", "Fundamental", 1), ("h2", "Second harmonic", 1), ("baseline", "Baseline", 1),
+              ("residual", "Residual (×10)", 10)]
 
 observations = pickle.load(open(observation_pkl, "rb"))
 fps = float(observations["fps"])
-signals = {e["method"]: e["estimate"]["signal_hat"] for e in observations["estimates"]}
-final = pickle.load(open(final_pkl, "rb"))
-estimate = final["estimates"][0]["estimate"]
+signals = {e["method"]: np.asarray(e["estimate"]["signal_hat"], float).reshape(-1) for e in observations["estimates"]}
+estimate = pickle.load(open(final_pkl, "rb"))["estimates"][0]["estimate"]
+families = json.loads(estimate["meta"])["observation_families"]
+precision = 1.0 / np.asarray(estimate["diagnostics"]["R_eff_t_channels"], float)
+update_share = precision / precision.sum(axis=0)
 trial = final_pkl.rsplit("/", 1)[1][:-4]
 windows = pd.read_csv(rates_csv).query("trial == @trial")
 
+
+def band_passed(x):
+    return sosfiltfilt(butter(2, BAND_HZ, btype="band", fs=fps, output="sos"), x)
+
+
+def shown(x):
+    time = np.arange(x.size) / fps
+    keep = (time >= SPAN_S[0]) & (time <= SPAN_S[1])
+    return time[keep], x[keep]
+
+
+scaled = {family: median_z(band_passed(signals[SIGNAL_OF[family]])) for family in families}
+# the transient: the time of the largest median over the observations of |z|
+n_common = min(z.size for z in scaled.values())
+median_abs = np.median([np.abs(z[:n_common]) for z in scaled.values()], axis=0)
+common_time = np.arange(n_common) / fps
+in_span = (common_time >= SPAN_S[0]) & (common_time <= SPAN_S[1])
+TRANSIENT_S = float(common_time[np.argmax(np.where(in_span, median_abs, -1))])
+
+# vertical layout of the right column, in mm
+LEFT_X, LABEL_X, PLOT_X0, PLOT_X1 = 60.0, 63.0, 86.0, 174.5
+TEXT_LINE = 3.8
+B_TOP, LANE, TRACE_H, SHARE_H = 8.0, 11.0, 7.0, 2.6
+B_END = B_TOP + len(families) * LANE - (LANE - TRACE_H - 0.4 - SHARE_H)
+C_TOP, C_LANE = B_END + TEXT_LINE, 5.2
+C_END = C_TOP + len(COMPONENTS) * C_LANE - 0.6
+D_HEAD = C_END + TEXT_LINE + 2.6
+RATE_Y0, WAVE_Y0, WAVE_Y1 = D_HEAD + 3.0, D_HEAD + 8.4, D_HEAD + 18.4
+HEIGHT = WAVE_Y1 + 8.6
+
 fig = plt.figure(figsize=(WIDTH * MM, HEIGHT * MM))
-ax = fig.add_axes((0, 0, 1, 1))
-ax.set(xlim=(0, WIDTH), ylim=(HEIGHT, 0))
-ax.axis("off")
+canvas = fig.add_axes((0, 0, 1, 1))
+canvas.set(xlim=(0, WIDTH), ylim=(HEIGHT, 0))
+canvas.axis("off")
 
 
-def mini_axes(x0, y0, x1, y1):
-    return fig.add_axes((x0 / WIDTH, 1 - y1 / HEIGHT, (x1 - x0) / WIDTH, (y1 - y0) / HEIGHT))
+def axes_mm(x0, y0, x1, y1):
+    ax = fig.add_axes((x0 / WIDTH, 1 - y1 / HEIGHT, (x1 - x0) / WIDTH, (y1 - y0) / HEIGHT))
+    ax.set_xlim(*SPAN_S)
+    ax.patch.set_visible(False)
+    for side in ("top", "right", "left", "bottom"):
+        ax.spines[side].set_visible(False)
+    ax.set(xticks=[], yticks=[])
+    return ax
 
 
-def panel(x0, y0, x1, y1, letter, name):
-    ax.add_patch(FancyBboxPatch((x0, y0), x1 - x0, y1 - y0, boxstyle="round,pad=0,rounding_size=1.2", fc="none",
-                                ec=FRAME, lw=0.5))
-    ax.text(x0 + 1.4, y0 + 1.3, letter, fontsize=8, fontweight="bold", va="top")
-    ax.text(x0 + 4.6, y0 + 1.75, name, fontsize=6, fontweight="bold", va="top")
+def heading(x, y, letter, name):
+    canvas.text(x, y, letter, fontsize=8, fontweight="bold", va="baseline")
+    canvas.text(x + 3.4, y, name, fontsize=6.5, fontweight="bold", va="baseline")
 
 
-def image(array, x0, y0, width):
-    height = width * array.shape[0] / array.shape[1]
-    ax.imshow(array, extent=(x0, x0 + width, y0 + height, y0), interpolation="lanczos", zorder=1)
-    return height
+def arrow(p0, p1, lw=0.5, head=(0.8, 1.3)):
+    canvas.add_patch(FancyArrowPatch(p0, p1, arrowstyle=f"-|>,head_width={head[0]},head_length={head[1]}",
+                                     mutation_scale=1, lw=lw, color=INK, shrinkA=0, shrinkB=0))
 
 
-def block_arrow(x0, y0, x1, y1):
-    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="simple,head_width=2.4,head_length=1.5,tail_width=1.0",
-                                 fc=BLOCK, ec="none", mutation_scale=1.6))
+def row_label(y, text):
+    canvas.text(LABEL_X, y, text, fontsize=5.5, va="center")
 
 
-def arrow(x0, y0, x1, y1):
-    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="-|>,head_width=0.9,head_length=1.6",
-                                 mutation_scale=1, lw=0.5, color=INK, shrinkA=0, shrinkB=0))
+def time_to_mm(t):
+    return PLOT_X0 + (t - SPAN_S[0]) / (SPAN_S[1] - SPAN_S[0]) * (PLOT_X1 - PLOT_X0)
 
 
-# a: video frames
-panel(0.3, 0.3, 19.5, 41.0, "a", "Video")
-for row, label in enumerate(["1", "$t$", "$T$"]):
-    top = 7.2 + row * 11.8
-    height = image(frame, 4.8, top, 12.0)
-    ax.text(2.4, top + height / 2, label, fontsize=6, ha="center", va="center")
-    if row < 2:
-        ax.text(10.8, top + height + 1.6, "$\\vdots$", fontsize=6, ha="center", va="center", color=NEUTRAL)
+# the guide at the transient runs behind every row of the right column
+canvas.plot([time_to_mm(TRANSIENT_S)] * 2, [B_TOP - 1.0, WAVE_Y1], color="#d6d6d6", lw=0.6, zorder=0)
 
-# b: regions of interest
-panel(23.3, 0.3, 53.5, 41.0, "b", "Regions")
-photo_x, photo_y, photo_w = 25.0, 7.0, 26.8
-photo_h = image(frame, photo_x, photo_y, photo_w)
-to_mm = photo_w / frame.shape[1]
-for (x0, y0, x1, y1), colour in [(TORSO_BOX, TORSO), (CHEST_BOX, CHEST)]:
-    ax.add_patch(Rectangle((photo_x + x0 * to_mm, photo_y + y0 * to_mm), (x1 - x0) * to_mm, (y1 - y0) * to_mm,
-                           fc="none", ec=colour, lw=0.7, ls=(0, (2.2, 1.2)), zorder=2))
-shoulder_y = photo_y + (CHEST_BOX[1] + CHEST_BOX[3]) / 2 * to_mm
-for x in (CHEST_BOX[0], CHEST_BOX[2]):
-    ax.add_patch(Circle((photo_x + x * to_mm, shoulder_y), 0.6, fc="white", ec=INK, lw=0.5, zorder=3))
-key_y = photo_y + photo_h + 3.4
-ax.add_patch(Circle((26.4, key_y), 0.6, fc="white", ec=INK, lw=0.5))
-ax.text(28.6, key_y, "Shoulder landmarks", fontsize=5.5, va="center")
-for row, (colour, label) in enumerate([(CHEST, "Chest ROI"), (TORSO, "Torso box")]):
-    y = key_y + 3.6 * (row + 1)
-    ax.plot([25.3, 27.6], [y, y], color=colour, lw=0.7, ls=(0, (2.2, 1.2)))
-    ax.text(28.6, y, label, fontsize=5.5, va="center")
-block_arrow(19.7, 20, 23.1, 20)
-block_arrow(53.7, 20, 57.1, 20)
+# a: where the observations are measured
+heading(0.5, 4.0, "a", "Measurement regions")
+cx, top = 20.0, 9.0
+canvas.add_patch(Ellipse((cx, top + 6.0), 8.6, 10.6, fc="none", ec=OUTLINE, lw=0.7))
+body = Path([(cx - 3.0, top + 11.0), (cx - 3.0, top + 13.4), (cx - 15.0, top + 15.2), (cx - 18.6, top + 18.4),
+             (cx - 19.6, top + 30.0), (cx + 19.6, top + 30.0), (cx + 18.6, top + 18.4), (cx + 15.0, top + 15.2),
+             (cx + 3.0, top + 13.4), (cx + 3.0, top + 11.0)],
+            [Path.MOVETO, Path.LINETO, Path.CURVE3, Path.CURVE3, Path.LINETO, Path.MOVETO, Path.LINETO,
+             Path.CURVE3, Path.CURVE3, Path.LINETO])
+canvas.add_patch(PathPatch(body, fc="none", ec=OUTLINE, lw=0.7))
+shoulder_y, span = top + 15.6, 27.0
+strip_height = 0.2 * span
+canvas.add_patch(Rectangle((cx - span / 2, shoulder_y - strip_height / 2), span, strip_height, fc="none", ec=CHEST,
+                           lw=0.8))
+canvas.add_patch(Rectangle((cx - 9.5, top + 12.0), 19.0, 18.0, fc="none", ec=TORSO, lw=0.8, ls=(0, (2.2, 1.2))))
+for x in (cx - span / 2, cx + span / 2):
+    canvas.add_patch(Circle((x, shoulder_y), 0.75, fc="white", ec=INK, lw=0.5, zorder=3))
+# breathing motion, inside the torso box
+canvas.add_patch(FancyArrowPatch((cx - 5.4, top + 19.6), (cx - 5.4, top + 27.0),
+                                 arrowstyle="<|-|>,head_width=0.8,head_length=1.3", mutation_scale=1, lw=0.5,
+                                 color=INK, shrinkA=0, shrinkB=0))
+canvas.text(cx - 3.8, top + 23.3, "Breathing\nmotion", fontsize=5.5, va="center", linespacing=1.1)
+# direct labels beside the marks, each joined to its mark by a hairline
+LABEL_A = 42.5
+for (x0, y0), (x1, y1), text, colour in [
+        ((cx + span / 2 + 0.7, shoulder_y - 0.4), (LABEL_A - 1.0, shoulder_y - 5.6), "Shoulder landmark", INK),
+        ((cx + span / 2, shoulder_y + strip_height / 2), (LABEL_A - 1.0, shoulder_y + strip_height / 2), "Chest strip", CHEST),
+        ((cx + 9.5, top + 28.4), (LABEL_A - 1.0, top + 28.4), "Torso box", TORSO)]:
+    canvas.plot([x0, x1], [y0, y1], color=GUIDE, lw=0.35)
+    canvas.text(LABEL_A, y1, text, fontsize=5.5, va="center", color=colour)
 
-# c: the five observations, each in a slot with its tile centred and its trace across the slot
-panel(57.3, 0.3, WIDTH - 0.3, 41.0, "c", "Video-derived observations")
-slot, gap, left = 21.16, 2.4, 58.7
-pitch = slot + gap
-for k, (name, label, tile) in enumerate(OBSERVATIONS):
-    x = left + k * pitch
-    middle = x + slot / 2
-    ax.text(middle, 11.0, label, fontsize=5.5, ha="center", va="bottom")
-    if tile is None:
-        correlation_icon(middle - 5.5, 12.4, 11.0, 8.6, "quadratic")
-    else:
-        thumb = thumbnail(*tiles[tile], photograph=name == "torso_shift")
-        thumb_h = 11.8 * thumb.shape[0] / thumb.shape[1]
-        image(thumb, middle - 5.9, 11.8 + (9.8 - thumb_h) / 2, 11.8)
-    t, y = scaled_trace(signals[name], fps)
-    ax.plot(x + 0.75 + t * (slot - 1.5), 26.0 - y * 2.6, color=NEUTRAL, lw=0.45)
-    ax.text(middle, 32.0, f"$o_{k + 1}(t)$", fontsize=7, ha="center", va="center")
-for x0, x1, label, colour in [(left, left + 3 * pitch + slot, "Chest ROI", CHEST),
-                              (left + 4 * pitch, left + 4 * pitch + slot, "Torso box", TORSO)]:
-    ax.plot([x0, x1], [35.6, 35.6], color=colour, lw=0.7, ls=(0, (2.2, 1.2)))
-    ax.text((x0 + x1) / 2, 37.8, label, fontsize=5.5, ha="center", va="center")
-block_arrow(59.95, 41.2, 59.95, 44.6)
+# b: observations over their share of the update
+heading(LEFT_X, 4.0, "b", "Observations and their share of the update")
+for k, family in enumerate(families):
+    label, _, colour = FAMILIES[family]
+    y0 = B_TOP + k * LANE
+    trace_axes = axes_mm(PLOT_X0, y0, PLOT_X1, y0 + TRACE_H)
+    time, z = shown(scaled[family])
+    beyond = draw_trace(trace_axes, time, z, OBS, lw=0.45)
+    trace_axes.set_ylim(-3.2, 3.2)
+    if k == 0 and beyond.any():
+        # the first compressed stretch is named once, in its own tone, beside its end
+        # named beside the plateau: right of the end of the compressed stretch that holds the largest value
+        peak = int(np.argmax(np.where(beyond, np.abs(z), -1)))
+        end = peak + int(np.argmin(beyond[peak:]))
+        trace_axes.text(time[end] + 0.5, 3.0, "compressed", fontsize=5, color=lighter(OBS, 0.3), va="top")
+    share_y = y0 + TRACE_H + 0.4
+    share_axes = axes_mm(PLOT_X0, share_y, PLOT_X1, share_y + SHARE_H)
+    share_time, share = shown(update_share[k])
+    draw_share(share_axes, share_time, share, colour)
+    row_label(y0 + TRACE_H / 2, label)
+    if k == 0:
+        row_label(share_y + SHARE_H / 2, "Update share")
+        canvas.plot([PLOT_X0 - 1.2] * 2, [share_y, share_y + SHARE_H], color=INK, lw=0.4)
+        for value, y in ((1, share_y), (0, share_y + SHARE_H)):
+            canvas.text(PLOT_X0 - 2.0, y, str(value), fontsize=4.5, ha="right", va="center")
 
-# d: observation law
-panel(0.3, 44.8, 62.6, HEIGHT - 0.3, "d", "Reliability-weighted observation law")
-rows_y = [57.4, 61.7, 65.6, 69.6]
-entries = [("$o_1(t)$", "$R^{\\mathrm{eff}}_{1,t}$", "$\\pi_{1,t}$"), ("$o_2(t)$", "$R^{\\mathrm{eff}}_{2,t}$",
-           "$\\pi_{2,t}$"), ("$\\vdots$", "$\\vdots$", "$\\vdots$"),
-           ("$o_5(t)$", "$R^{\\mathrm{eff}}_{5,t}$", "$\\pi_{5,t}$")]
-for x0, x1 in [(9.0, 19.0), (33.0, 43.0)]:
-    for side, tick in [(x0, 0.8), (x1, -0.8)]:
-        ax.plot([side + tick, side, side, side + tick], [55.0, 55.0, 72.0, 72.0], color=INK, lw=0.5)
-ax.text(14.0, 52.2, "Observations", fontsize=5.5, ha="center", va="center")
-ax.text(38.0, 52.2, "Noise variances", fontsize=5.5, ha="center", va="center")
-ax.text(55.0, 52.2, "Trust", fontsize=5.5, ha="center", va="center")
-ax.text(5.6, 63.5, "$\\mathbf{y}_t$ =", fontsize=7, ha="center", va="center")
-for y, (observation, variance, trust) in zip(rows_y, entries):
-    ax.text(14.0, y, observation, fontsize=7, ha="center", va="center")
-    ax.text(38.0, y, variance, fontsize=7, ha="center", va="center")
-    ax.text(55.0, y, trust, fontsize=7, ha="center", va="center")
-    if trust != "$\\vdots$":
-        arrow(52.2, y, 44.0, y)
-ax.text(31.4, 76.0, "$\\mathbf{y}_t = H_t\\,\\mathbf{x}_t + \\mathbf{v}_t$,   "
-        "$\\mathbf{v}_t \\sim \\mathcal{N}(\\mathbf{0},\\, \\mathrm{diag}\\,R^{\\mathrm{eff}}_{k,t})$,   "
-        "$R^{\\mathrm{eff}}_{k,t} \\propto R^{\\mathrm{self}}_{k,t}\\,/\\,\\pi_{k,t}$",
-        fontsize=6.5, ha="center", va="center")
-block_arrow(62.8, 62, 66.2, 62)
+# c: the state-space model (left) and its smoothed state components (right)
+heading(0.5, C_TOP + 2.0, "c", "State-space model and latent state")
+state_y = C_TOP + 13.0
+observation_y = state_y + 19.0
+for x, name in [(9.0, "$\\mathbf{x}_{t-1}$"), (25.0, "$\\mathbf{x}_t$"), (41.0, "$\\mathbf{x}_{t+1}$")]:
+    canvas.add_patch(Circle((x, state_y), 3.4, fc="white", ec=INK, lw=0.6))
+    canvas.text(x, state_y, name, fontsize=6, ha="center", va="center")
+for x0 in (9.0, 25.0):
+    arrow((x0 + 3.4, state_y), (x0 + 12.6, state_y))
+    canvas.text(x0 + 8.0, state_y - 1.6, "$F_t$", fontsize=5.5, ha="center", va="baseline")
+for k, family in enumerate(families):
+    _, label, colour = FAMILIES[family]
+    x = 25.0 + (k - (len(families) - 1) / 2) * 14.0
+    canvas.add_patch(FancyBboxPatch((x - 6.0, observation_y - 2.0), 12.0, 4.0,
+                                    boxstyle="round,pad=0,rounding_size=0.8", fc="white", ec=colour, lw=0.7))
+    canvas.text(x, observation_y, label, fontsize=5.5, ha="center", va="center")
+    arrow((25.0, state_y + 3.4), (x, observation_y - 2.0))
+canvas.text(26.6, state_y + 8.2, "$H_t$", fontsize=5.5, va="center")
+canvas.text(1.0, observation_y + 7.4, "$\\mathbf{x}_t = F_t\\mathbf{x}_{t-1} + \\mathbf{w}_t$,  "
+            "$\\mathbf{y}_t = H_t\\mathbf{x}_t + \\mathbf{v}_t$", fontsize=6, va="center")
+canvas.text(1.0, observation_y + 11.4, "$\\mathbf{v}_t \\sim \\mathcal{N}(\\mathbf{0},\\,\\mathrm{diag}\\,R^{\\mathrm{eff}}_{k,t})$,  "
+            "$R^{\\mathrm{eff}}_{k,t} \\propto R^{\\mathrm{self}}_{k,t}\\,/\\,\\pi_{k,t}$", fontsize=6, va="center")
+decomposition = estimate["decomposition"]
+fundamental_scale = 1.4826 * np.median(np.abs(np.asarray(decomposition["h1"], float)))
+for k, (key, label, gain) in enumerate(COMPONENTS):
+    y0 = C_TOP + k * C_LANE
+    ax = axes_mm(PLOT_X0, y0, PLOT_X1, y0 + C_LANE - 0.6)
+    time, values = shown(gain * np.asarray(decomposition[key], float) / fundamental_scale)
+    ax.plot(time, values, color=PARH if key == "h1" else OBS, lw=0.5)
+    ax.set_ylim(-2.2, 2.2)
+    row_label(y0 + (C_LANE - 0.6) / 2, label)
+# one connector from the node x_t to the stack of state components, which a bracket spans
+bracket_x = LEFT_X + 0.8
+canvas.plot([bracket_x] * 2, [C_TOP, C_END], color=INK, lw=0.5)
+connector_y = C_TOP + 5.2
+canvas.plot([25.0, 25.0], [state_y - 3.4, connector_y], color=INK, lw=0.5)
+arrow((25.0, connector_y), (bracket_x, connector_y))
 
-# e: state-space model
-panel(66.4, 44.8, 118.4, HEIGHT - 0.3, "e", "State-space model")
-centres = [77.4, 92.4, 107.4]
-for x, sub in zip(centres, ["t-1", "t", "t+1"]):
-    ax.add_patch(Circle((x, 56.4), 3.1, fc="white", ec=INK, lw=0.5))
-    ax.text(x, 56.4, f"$\\mathbf{{x}}_{{{sub}}}$", fontsize=7, ha="center", va="center")
-    arrow(x, 59.5, x, 63.4)
-    ax.text(x, 65.8, f"$\\mathbf{{y}}_{{{sub}}}$", fontsize=7, ha="center", va="center")
-for x0, x1 in zip(centres[:-1], centres[1:]):
-    arrow(x0 + 3.1, 56.4, x1 - 3.1, 56.4)
-for x in (70.6, 114.2):
-    ax.text(x, 56.4, "$\\cdots$", fontsize=6, ha="center", va="center")
-ax.text((centres[0] + centres[1]) / 2, 55.2, "$F_t$", fontsize=6.5, ha="center", va="bottom")
-ax.text(centres[1] + 0.8, 61.4, "$H_t$", fontsize=6.5, ha="left", va="center")
-state_key = [("$h^{(1)}_c,\\, h^{(1)}_s$", "fundamental", 80.6, 71.4), ("$h^{(2)}_c,\\, h^{(2)}_s$", "second harmonic", 80.6, 75.9),
-             ("$b,\\, \\dot b$", "baseline", 103.0, 71.4), ("$r,\\, \\dot r$", "residual", 103.0, 75.9)]
-for symbols, meaning, x, y in state_key:
-    ax.text(x, y, symbols, fontsize=7, ha="right", va="center")
-    ax.text(x + 1.0, y, meaning, fontsize=5.5, ha="left", va="center")
-block_arrow(118.6, 62, 122.0, 62)
-
-# f: outputs
-panel(122.2, 44.8, WIDTH - 0.3, HEIGHT - 0.3, "f", "Outputs")
-
-
-rate = mini_axes(133.0, 51.0, 172.0, 59.6)
+# d: outputs
+heading(LEFT_X, D_HEAD, "d", "Outputs")
+rate = axes_mm(PLOT_X0, RATE_Y0, PLOT_X1, RATE_Y0 + 4.6)
 rate.plot(windows.window + 15, windows.parh_track_bpm, color=PARH, lw=0.8)
-rate.set(xlim=(0, 60), xticks=[0, 15, 30, 45, 60], xticklabels=[], ylim=(8, 16), yticks=[8, 12, 16])
-rate.set_ylabel("Rate (bpm)", fontsize=5.5)
-waveform = mini_axes(133.0, 63.0, 172.0, 71.6)
-video_time = np.arange(np.asarray(estimate["z_full_smoothed"]).size) / fps
-shown = video_time >= SKIP_S
-z = np.asarray(estimate["z_full_smoothed"], float)[shown]
-waveform.plot(video_time[shown], (z - np.median(z)) / (1.4826 * np.median(np.abs(z - np.median(z)))), color=PARH,
-              lw=0.5)
-waveform.set(xlim=(0, 60), xticks=[0, 15, 30, 45, 60], ylim=(-3.2, 3.2), yticks=[])
-waveform.set_ylabel("Waveform", fontsize=5.5)
+low, high = np.floor(windows.parh_track_bpm.min()) - 1, np.ceil(windows.parh_track_bpm.max()) + 1
+rate.set(ylim=(low, high), yticks=[low, high])
+rate.spines["left"].set_visible(True)
+rate.tick_params(length=1.2, pad=0.8, labelsize=5)
+row_label(RATE_Y0 + 2.3, "Rate (bpm)")
+waveform = axes_mm(PLOT_X0, WAVE_Y0, PLOT_X1, WAVE_Y1)
+time, z = shown(median_z(np.asarray(estimate["z_full_smoothed"], float)))
+draw_trace(waveform, time, z, PARH, lw=0.5)
+waveform.set(ylim=(-3.4, 3.4), xticks=TICKS_S)
+waveform.spines["bottom"].set_visible(True)
+waveform.tick_params(length=1.5, pad=1, labelsize=5.5)
 waveform.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
-for axes in (rate, waveform):
-    axes.tick_params(labelsize=5.5, pad=1)
-for axes in (rate, waveform):
-    axes.yaxis.set_label_coords(-0.12, 0.5)
+row_label(WAVE_Y0 + (WAVE_Y1 - WAVE_Y0) / 2, "Waveform")
 
 fig.savefig(out_pdf, dpi=600)
-print(f"{trial}: rate {windows.parh_track_bpm.min():.1f}-{windows.parh_track_bpm.max():.1f} bpm")
+print(f"{trial}: families {families}; update share {update_share.min():.2f}-{update_share.max():.2f}; "
+      f"rate {windows.parh_track_bpm.min():.1f}-{windows.parh_track_bpm.max():.1f} bpm; "
+      f"transient {TRANSIENT_S:.1f} s; height {HEIGHT:.1f} mm")
