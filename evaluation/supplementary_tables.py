@@ -32,6 +32,9 @@ DATASETS = [("COHFACE", "cohface_frozen"), ("MAHNOB-HCI", "mahnob_frozen_onset")
 MOTION_METHODS = [m for m in METHODS if m[0] != "median_fusion"]
 TERCILES = ["low", "middle", "high"]
 records_dir, out_dir = sys.argv[1:3]
+# MAHNOB-HCI terciles and motion tertiles on the test participants only, as in the main Tables 2 and 3
+split = pd.read_csv(os.path.join(records_dir, "mahnob_subject_split.csv"))
+MAHNOB_TEST_TRIALS = set(split[split.split == "test"].trial)
 
 
 def number(x, signed=False, digits=2):
@@ -43,6 +46,8 @@ for reference, _ in REFERENCES:
     for dataset, prefix in DATASETS:
         trials = pd.read_csv(os.path.join(records_dir, "rate_agreement", f"{prefix}_trial_means.csv"))
         trials = trials[trials.reference == reference].copy()
+        if dataset == "MAHNOB-HCI":
+            trials = trials[trials.trial.isin(MAHNOB_TEST_TRIALS)]
         edges = trials[trials.method == "parh_track"].reference_bpm.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
         trials["tercile"] = pd.cut(trials.reference_bpm, edges, labels=TERCILES, include_lowest=True)
         ranges = " & ".join(f"\\multicolumn{{2}}{{c}}{{{edges[k]:.1f}--{edges[k + 1]:.1f}}}" for k in range(3))
@@ -60,6 +65,8 @@ for reference, _ in REFERENCES:
 lines = []
 for dataset, prefix in DATASETS:
     trials = pd.read_csv(os.path.join(records_dir, "rate_agreement", f"{prefix}_head_motion_trials.csv"))
+    if dataset == "MAHNOB-HCI":
+        trials = trials[trials.trial.isin(MAHNOB_TEST_TRIALS)]
     motion = trials.drop_duplicates("trial").groupby("tertile").motion_range.agg(["min", "max"]).reindex(TERCILES)
     ranges = ", ".join(f"{motion.loc[t, 'min']:.1f}--{motion.loc[t, 'max']:.1f}" for t in TERCILES)
     lines.append(f"\\multicolumn{{10}}{{l}}{{\\textit{{{dataset}}}, {trials.trial.nunique()} trials}} \\\\")

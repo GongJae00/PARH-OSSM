@@ -1,12 +1,13 @@
-"""R2-2: Supplementary figure of trial-mean rate agreement, one reference definition per figure.
+"""Supplementary figure of trial-mean rate agreement, one reference definition per figure.
 
 Rows: COHFACE estimate against reference, COHFACE Bland-Altman, then the same for MAHNOB-HCI.
-Columns: the four video methods. The values come from rate_agreement.py's trial-means CSVs, so the
-slope, r, bias and limits printed in each panel are the ones in its summary. The constant predictor,
+Columns: the four video methods. The values come from rate_agreement.py's trial-means CSVs; MAHNOB-HCI is
+restricted to the test participants, so its slope, r, bias and limits are computed on those trials. The constant predictor,
 which outputs the cohort rate in every window, appears as a horizontal line in the agreement panels.
 
 usage: rate_agreement_figure.py <records dir> <reference: hilbert|welch|count> <out.pdf>
-<records dir> holds rate_agreement/, the trial-means CSVs written by evaluation/rate_agreement.py.
+<records dir> holds rate_agreement/, the trial-means CSVs written by evaluation/rate_agreement.py, and the
+MAHNOB-HCI subject split (evaluation/mahnob_subject_split.csv).
 """
 import os
 import sys
@@ -26,15 +27,20 @@ POINT = "#4a4a4a"
 ON_POINTS = [patheffects.withStroke(linewidth=1.5, foreground="white")]
 METHODS = [("direct_p1d_welch", "Direct P1D quadratic"), ("median_fusion", "Median fusion"),
            ("ossm_kf_track", "OSSM-KF"), ("parh_track", "PARH-OSSM")]
-DATASETS = [("COHFACE", "cohface_first_frame_trial_means.csv"), ("MAHNOB-HCI", "mahnob_frozen_onset_trial_means.csv")]
+DATASETS = [("COHFACE", "cohface_frozen_trial_means.csv"), ("MAHNOB-HCI", "mahnob_frozen_onset_trial_means.csv")]
 REFERENCE_NAMES = {"hilbert": "Hilbert", "welch": "Welch", "count": "breath-count"}
 
 records_dir, reference, out_path = sys.argv[1:4]
+# MAHNOB-HCI on its test participants only, as in the main Tables 2 and 3
+split = pd.read_csv(os.path.join(records_dir, "mahnob_subject_split.csv"))
+mahnob_test_trials = set(split[split.split == "test"].trial)
 fig, axes = plt.subplots(4, 4, figsize=(183 * MM, 168 * MM))
 
 for d, (dataset, file_name) in enumerate(DATASETS):
     trials = pd.read_csv(os.path.join(records_dir, "rate_agreement", file_name))
     trials = trials[trials.reference == reference]
+    if dataset == "MAHNOB-HCI":
+        trials = trials[trials.trial.isin(mahnob_test_trials)]
     cohort_rate = trials[trials.method == "constant"].estimate_bpm.iloc[0]
     shown = trials[trials.method != "constant"]
     low, high = np.floor(shown[["estimate_bpm", "reference_bpm"]].min().min()), np.ceil(shown[["estimate_bpm", "reference_bpm"]].max().max())

@@ -1,4 +1,4 @@
-"""R1-3: one trial per dataset followed through the stages of PARH-OSSM, against the belt.
+"""Figure 2: one trial per dataset followed through the stages of PARH-OSSM, against the belt.
 
 Columns: a COHFACE trial and a MAHNOB-HCI development trial, each the trial whose PARH-OSSM MAE against the
 Hilbert reference (scored as main_tables.py scores it) is closest to the median over that dataset's
