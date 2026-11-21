@@ -70,7 +70,7 @@ for dataset, prefix in DATASETS:
     motion = trials.drop_duplicates("trial").groupby("tertile").motion_range.agg(["min", "max"]).reindex(TERCILES)
     ranges = ", ".join(f"{motion.loc[t, 'min']:.1f}--{motion.loc[t, 'max']:.1f}" for t in TERCILES)
     lines.append(f"\\multicolumn{{10}}{{l}}{{\\textit{{{dataset}}}, {trials.trial.nunique()} trials}} \\\\")
-    lines.append(f"\\multicolumn{{10}}{{l}}{{\\quad Head motion of the low, middle, and high tertiles: {ranges}\\,\\% of the face height}} \\\\")
+    lines.append(f"\\multicolumn{{10}}{{l}}{{\\quad Head motion of the low, middle, and high terciles: {ranges}\\,\\% of the face height}} \\\\")
     median = trials.groupby(["method", "reference", "tertile"]).MAE.median()
     for method, name in MOTION_METHODS:
         cells = " & ".join(number(median.loc[(method, r, t)]) for r, _ in REFERENCES for t in TERCILES)
