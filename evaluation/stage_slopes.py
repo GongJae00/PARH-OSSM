@@ -1,12 +1,11 @@
-"""Where does PARH-OSSM's pull toward the cohort rate on MAHNOB-HCI arise?
+"""How far each method and each stage of PARH-OSSM follows the differences in rate between trials.
 
 Per method or stage, the trial-mean estimate is regressed on the trial-mean reference over the windows where both
-exist (at least 10 per trial, as in rate_agreement.py). A slope near 1 with a large spread of trial means follows
-the between-trial differences of the reference; a slope near 0 with the same spread is noise; a slope near 0 with
-a small spread is an estimate pulled toward the middle. The code holds no fixed or population rate (the initial
-frequency comes from each video's first 10 s), so a pull that appears at the multichannel filter, before the
-readout and the rate posterior, comes from combining the observations. The median of the trial means shows where
-they gather: near the middle of the 0.08-0.5 Hz band (17.4 bpm) for noise, near the cohort rate for a pull toward it.
+exist (at least 10 per trial, as in rate_agreement.py). A slope near 1 follows the between-trial differences of the
+reference; a slope near 0 does not, whether the trial means scatter (noise) or gather (a pull toward one rate). The
+SD and median of the trial means tell the two apart and show where they gather. The code holds no population rate
+(the reliability priors are per-observation scores, and the initial frequency comes from each video's first 10 s);
+observation_track_slope.py shows whether the observations already gather before they are combined.
 
 usage: stage_slopes.py <records dir> <reference: hilbert|welch|count> mahnob <evaluated split: development|test>
        stage_slopes.py <records dir> <reference: hilbert|welch|count> cohface
