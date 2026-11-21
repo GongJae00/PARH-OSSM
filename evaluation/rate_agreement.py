@@ -4,15 +4,16 @@ Every method is scored against each of the three reference definitions on the sa
 (window_rates_three_references.py, plus median_fusion_window_rates.py). Per trial and reference,
 the estimate and the reference are averaged over the windows where both exist, with at least 10 such
 windows; the per-trial MAE is the mean |estimate - reference| over those windows. The constant
-predictor outputs, in every window, the median over trials of the trial-mean reference rate, as in
-three_reference_summary.py. Trials enter only when direct P1D is computable, the common set of the
+predictor outputs, in every window, the median trial-mean reference rate of the development trials, as in
+main_tables.py: all trials on COHFACE, the trials of the development subjects of the split csv on MAHNOB-HCI.
+Trials enter only when direct P1D is computable, the common set of the
 paper's paired analyses.
 
 Agreement is between trial means: the least-squares slope and Pearson r of the estimate on the
 reference, and the Bland-Altman bias (estimate minus reference) with limits of agreement at
 bias +/- 1.96 SD. Terciles split the trials by their trial-mean reference rate, per reference.
 
-usage: rate_agreement.py <dataset name> <window-rate csv> <median fusion csv>:<column> <trial-means csv out>
+usage: rate_agreement.py <dataset name> <window-rate csv> <median fusion csv>:<column> <trial-means csv out> [split csv]
 """
 import sys
 
@@ -31,9 +32,14 @@ windows = pd.read_csv(sys.argv[2]).merge(fusion, on=["trial", "window"], how="le
 windows = windows[windows.trial.isin(windows.dropna(subset=["direct_p1d_welch_bpm"]).trial.unique())]
 
 trial_reference = windows.groupby("trial")[[f"{r}_reference_bpm" for r in REFERENCES]].mean()
+if len(sys.argv) > 5:
+    split = pd.read_csv(sys.argv[5])
+    development_reference = trial_reference[trial_reference.index.isin(split[split.split == "development"].trial)]
+else:
+    development_reference = trial_reference
 rows = []
 for r in REFERENCES:
-    cohort_rate = trial_reference[f"{r}_reference_bpm"].median()
+    cohort_rate = development_reference[f"{r}_reference_bpm"].median()
     for trial, w in windows.groupby("trial"):
         reference = w[f"{r}_reference_bpm"]
         for m in METHODS:
