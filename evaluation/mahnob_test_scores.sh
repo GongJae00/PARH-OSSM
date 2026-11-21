@@ -3,10 +3,16 @@
 # submitted procedure (run w2), then the secondary comparisons against the reliability controls, the component
 # ladder, and the leave-one-out runs, once per belt placement. This computes test-subject errors, so run it only
 # when the placement is settled. It reads the CSVs of evaluation/window_rates.sh and evaluation/bank_rates.sh.
+# It then writes the waveform agreement of the frozen run under both placements with the phase-randomized null and the
+# rows of the waveform table, the frozen run's trial means and head-motion tertiles on all 488 trials (onset
+# placement), the slopes of the trial means by stage and of the observation tracks, and the Supplementary tables.
+# <base data dir> holds the pickles of observations/extract.py, <final data dir> those of the frozen run of
+# estimate/materialize.sh. The rows of Tables 2 and 3 come from evaluation/main_tables.sh mahnob.
 #
-# usage (from the repository root): evaluation/mahnob_test_scores.sh <records dir> <out dir>
+# usage (from the repository root):
+#   evaluation/mahnob_test_scores.sh <records dir> <out dir> <base data dir> <final data dir> <MAHNOB-HCI folder> <jobs>
 set -e
-records=$1; out=$2
+records=$1; out=$2; base=$3; final=$4; mahnob=$5; jobs=$6
 split=evaluation/mahnob_subject_split.csv
 controls=(equal_readout shuffled_readout equal_filter)
 rungs=(plain_multichannel readout observation_law observability)
@@ -30,3 +36,19 @@ for placement in onset tail; do
     $(for e in "${exclusions[@]}"; do echo "$e=$records/mahnob_loo9_${e}${suffix}_window_rates_three_references.csv:parh_track_bpm"; done) \
     > "$out/mahnob_leave_one_out_test_${placement}.txt"
 done
+
+python evaluation/onset_alignment_waveform.py "$base" "$final" "$mahnob" "$jobs" > "$records/mahnob_onset_alignment_waveform.csv"
+python evaluation/waveform_table.py "$records" mahnob "$out/T_waveform_mahnob.tex" > "$out/mahnob_test_waveform_table.txt"
+
+mkdir -p "$records/rate_agreement"
+python evaluation/rate_agreement.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
+  "$records/mahnob_observation_fusion_window_rates.csv:median_fusion_nine_bpm" "$records/rate_agreement/mahnob_frozen_onset_trial_means.csv" \
+  "$split" > "$out/mahnob_frozen_onset_rate_agreement.txt"
+python evaluation/motion_tertiles.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
+  "$records/head_motion_trials.csv" "$records/rate_agreement/mahnob_frozen_onset_head_motion_trials.csv" \
+  > "$out/mahnob_frozen_onset_head_motion_tertiles.txt"
+for reference in hilbert welch count; do
+  python evaluation/stage_slopes.py "$records" $reference mahnob test
+done > "$out/mahnob_test_stage_slopes.txt"
+python evaluation/observation_track_slope.py "$records" "$base" "$final" test "$jobs" > "$out/mahnob_test_observation_track_slope.txt"
+python evaluation/supplementary_tables.py "$records" "$out"
