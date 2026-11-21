@@ -5,7 +5,6 @@ import h5py
 import numpy as np
 from pyedflib import EdfReader
 
-from evaluation.belt_reference import recorded_belt
 from observations.chest_roi import get_chest_ROI, sort_nicely
 
 
@@ -100,13 +99,14 @@ class MAHNOB(Dataset):
 		super().__init__(root)
 		self.name = 'mahnob'
 
-	def _video_duration_sec(self, video_path):
+	def _observation_duration_sec(self, video_path):
+		# The observation signals hold one sample per pair of consecutive frames, frames - 1 in all.
 		cap = cv2.VideoCapture(video_path)
 		frames = float(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0)
 		fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
 		cap.release()
-		if frames > 0.0 and fps > 0.0:
-			return frames / fps
+		if frames > 1.0 and fps > 0.0:
+			return (frames - 1.0) / fps
 		return None
 
 	def load_gt(self, sbj_path, video_path=None):
@@ -123,7 +123,7 @@ class MAHNOB(Dataset):
 		gt = reader.readSignal(channel)
 		reader.close()
 		if video_path is not None:
-			duration_sec = self._video_duration_sec(video_path)
+			duration_sec = self._observation_duration_sec(video_path)
 			if duration_sec is not None:
 				n = int(round(float(duration_sec) * float(self.fs_gt)))
 				if 16 <= n < len(gt):
@@ -131,8 +131,9 @@ class MAHNOB(Dataset):
 					# Tail-aligning the physiological trace to the section video avoids
 					# zero-lag waveform evaluation against a longer, earlier BDF span.
 					gt = gt[-n:]
-		# The fill of the last BDF data record comes after the recording ended; cutting it keeps the time axis.
-		return recorded_belt(gt)
+		# The reference keeps the fill of the last BDF data record: evaluation cuts it where the reference is read
+		# (evaluation.belt_reference.recorded_belt), and the onset placement takes its length as the video's.
+		return gt
 
 	def load_dataset(self):
 		print('\nLoading dataset ' + self.name + '...')
