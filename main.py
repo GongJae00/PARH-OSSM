@@ -28,6 +28,7 @@ from components.observations.methods import (
     AssistOFBridgeP1DQuadratic_Model,
     FusionOFP1DQuadratic_Model,
     FamilyMultiViewHypothesisSet_Model,
+    TorsoShift_Model,
 )
 from core.pipeline.wrapped_method import create_wrapped_method
 from core.pipeline.runner import extract_respiration
@@ -176,6 +177,8 @@ def _build_methods(method_configs, global_cfg=None):
         # Base methods
         elif name.lower() in ('of_model', 'of_farneback', 'of'):
             methods.append(OF_Model())
+        elif name.lower() == 'torso_shift':
+            methods.append(TorsoShift_Model())
         elif name.lower() in ('of_disp_bridge', 'of_displacement_bridge', 'of_bridge'):
             methods.append(OFDisplacementBridge_Model())
         elif name.lower() == 'dof':

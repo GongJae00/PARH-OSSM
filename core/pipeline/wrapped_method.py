@@ -23,6 +23,8 @@ from components.observations.methods import (
     AssistOFBridgeP1DQuadratic_Model,
     FusionOFP1DQuadratic_Model,
     FamilyMultiViewHypothesisSet_Model,
+    TorsoShift_Model,
+    TORSO_SHIFT_CACHE_FILE,
 )
 from components.models import OscillatorParams, build_head
 
@@ -45,6 +47,8 @@ def _normalize_base(name: str) -> str:
         return "of_farneback"
     if key in ("of_disp_bridge", "of_displacement_bridge", "of_bridge"):
         return "of_disp_bridge"
+    if key == "torso_shift":
+        return "torso_shift"
     if key == "dof":
         return "dof"
     if key in ("dof_disp_bridge", "dof_bridge", "dof_displacement_bridge"):
@@ -142,6 +146,10 @@ def _build_base(base_key: str):
     if base_key == "of_farneback":
         base = OF_Model()
         base.name = "of_farneback"
+        return base
+    if base_key == "torso_shift":
+        base = TorsoShift_Model()
+        base.name = "torso_shift"
         return base
     if base_key == "of_disp_bridge":
         base = OFDisplacementBridge_Model()
@@ -549,6 +557,8 @@ class OscillatorWrappedMethod(MethodBase):
             return None
         if self.base_key == "of_farneback":
             return os.path.join(trial_dir, "obs_of.npy")
+        if self.base_key == "torso_shift":
+            return os.path.join(trial_dir, TORSO_SHIFT_CACHE_FILE)
         if self.base_key == "of_disp_bridge":
             return os.path.join(trial_dir, "obs_of_bridge.npy")
         if self.base_key == "dof":

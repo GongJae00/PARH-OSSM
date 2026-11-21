@@ -1,7 +1,7 @@
 
 import os
 import numpy as np
-from core.utils.common import sort_nicely, get_chest_ROI, get_face_ROI
+from core.utils.common import sort_nicely, get_chest_ROI, get_face_ROI, recorded_belt
 from .base import DatasetBase
 
 class BP4D(DatasetBase):
@@ -182,7 +182,8 @@ class MAHNOB(DatasetBase):
 					# Tail-aligning the physiological trace to the section video avoids
 					# zero-lag waveform evaluation against a longer, earlier BDF span.
 					gt = gt[-n:]
-		return gt
+		# The fill of the last BDF data record comes after the recording ended; cutting it keeps the time axis.
+		return recorded_belt(gt)
 
 
 	def load_dataset(self):

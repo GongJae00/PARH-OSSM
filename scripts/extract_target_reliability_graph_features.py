@@ -31,6 +31,7 @@ GROUP_ORDER = [
     "G_P1D_low",
     "G_P1D_morph",
     "G_P1D_cons",
+    "G_Torso",
 ]
 
 GROUP_LABELS = {
@@ -41,6 +42,7 @@ GROUP_LABELS = {
     "G_P1D_low": "P1D_lin",
     "G_P1D_morph": "P1D_quad/cub",
     "G_P1D_cons": "P1D_cons",
+    "G_Torso": "Torso",
 }
 
 MACRO_FAMILY = {
@@ -51,6 +53,7 @@ MACRO_FAMILY = {
     "G_P1D_low": "P1D",
     "G_P1D_morph": "P1D",
     "G_P1D_cons": "P1D",
+    "G_Torso": "Torso",
 }
 
 BRIDGE_COUNTERPARTS = {
@@ -61,6 +64,7 @@ BRIDGE_COUNTERPARTS = {
     "G_P1D_low": {"G_P1D_morph", "G_P1D_cons"},
     "G_P1D_morph": {"G_P1D_low", "G_P1D_cons"},
     "G_P1D_cons": {"G_P1D_low", "G_P1D_morph"},
+    "G_Torso": set(),
 }
 
 COMPONENT_ROLE_PRIORS = {
@@ -71,6 +75,7 @@ COMPONENT_ROLE_PRIORS = {
     "G_P1D_low": dict(h1=0.45, h2=0.70, b=0.55, r=0.55, z_osc=0.42, z_full=0.75),
     "G_P1D_morph": dict(h1=0.42, h2=0.82, b=0.55, r=0.70, z_osc=0.40, z_full=0.88),
     "G_P1D_cons": dict(h1=0.55, h2=0.78, b=0.62, r=0.75, z_osc=0.52, z_full=0.92),
+    "G_Torso": dict(h1=0.72, h2=0.40, b=0.60, r=0.45, z_osc=0.70, z_full=0.55),  # G_OF_bridge's, see FAMILY_GROUPS in the materializer
 }
 
 
@@ -146,7 +151,7 @@ def _canonical_base(method: str) -> str:
         return "profile1d_quadratic"
     if text == "profile1d_cubic":
         return "profile1d_cubic"
-    if text in {"dof", "of_farneback", "of_disp_bridge", "dof_disp_bridge", "profile1d_consensus"}:
+    if text in {"dof", "of_farneback", "of_disp_bridge", "dof_disp_bridge", "profile1d_consensus", "torso_shift"}:
         return text
     return text
 
@@ -167,6 +172,8 @@ def method_group(method: str) -> str | None:
         return "G_P1D_morph"
     if base == "profile1d_consensus":
         return "G_P1D_cons"
+    if base == "torso_shift":
+        return "G_Torso"
     return None
 
 

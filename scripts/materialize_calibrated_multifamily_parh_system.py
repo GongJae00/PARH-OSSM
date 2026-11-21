@@ -33,6 +33,7 @@ DEFAULT_METHODS: Tuple[Tuple[str, str, str], ...] = (
     ("profile1D quadratic", "profile1d_quadratic", "profile1d"),
     ("profile1D cubic", "profile1d_cubic", "profile1d"),
     ("profile1d_consensus", "profile1d_consensus", "profile1d_consensus"),
+    ("torso_shift", "torso_shift", "torso"),
 )
 
 
@@ -80,8 +81,12 @@ DISPLACEMENT_ANCHOR_FAMILIES = {
     "profile1d_quadratic",
     "profile1d_cubic",
     "profile1d_consensus",
+    "torso_shift",
 }
 
+# G_Torso, the face-anchored torso displacement, has no derived parent and forms its own macro family;
+# wherever a group constant is named it takes the values of G_OF_bridge, the other integrated
+# vertical translation of an image region (fixed before any run with the torso family).
 FAMILY_GROUPS = {
     "of_farneback": "G_OF",
     "of_disp_bridge": "G_OF_bridge",
@@ -91,6 +96,7 @@ FAMILY_GROUPS = {
     "profile1d_quadratic": "G_P1D_morph",
     "profile1d_cubic": "G_P1D_morph",
     "profile1d_consensus": "G_P1D_cons",
+    "torso_shift": "G_Torso",
 }
 
 MOTION_TIMING_TRACK_GROUPS = {"G_DoF", "G_DoF_bridge"}
@@ -967,7 +973,7 @@ def _group_aware_half_rate_rescue(
     if rate_arr.size != weight_arr.size or rate_arr.size != len(groups):
         return float(anchor), False, 0.0
 
-    motion_groups = {"G_OF", "G_OF_bridge", "G_DoF", "G_DoF_bridge"}
+    motion_groups = {"G_OF", "G_OF_bridge", "G_DoF", "G_DoF_bridge", "G_Torso"}
     p1d_groups = {"G_P1D_low", "G_P1D_morph", "G_P1D_cons"}
     motion_low = motion_high = motion_weight = 0.0
     p1d_low = p1d_high = p1d_weight = 0.0
@@ -2324,6 +2330,7 @@ REGIME_GROUP_PRIOR = {
     "G_P1D_low": 0.88,
     "G_P1D_morph": 1.00,
     "G_P1D_cons": 1.08,
+    "G_Torso": 0.98,
 }
 
 RATE_TIMING_GROUP_PRIOR = {
@@ -2334,6 +2341,7 @@ RATE_TIMING_GROUP_PRIOR = {
     "G_P1D_low": 0.55,
     "G_P1D_morph": 0.55,
     "G_P1D_cons": 0.65,
+    "G_Torso": 0.90,
 }
 
 REGIME_CHANNEL_FLOOR = 0.06
@@ -2573,7 +2581,7 @@ def _regime_observation_law_runtime(
 
         motion_score = _group_score("G_DoF_bridge", "G_DoF")
         morphology_score = _group_score("G_P1D_cons", "G_P1D_morph", "G_P1D_low")
-        velocity_score = _group_score("G_OF_bridge", "G_OF")
+        velocity_score = _group_score("G_OF_bridge", "G_OF", "G_Torso")
         support_mass = float(np.clip(sum(group_quality.values()) / max(len(group_quality), 1), 0.0, 1.0))
         weak_score = float(np.clip(1.0 - max(motion_score, morphology_score, velocity_score, anchor_support), 0.0, 1.0))
         regime = _regime_name_from_scores(motion_score, morphology_score, velocity_score, weak_score)
@@ -2598,7 +2606,7 @@ def _regime_observation_law_runtime(
                 elif group in {"G_DoF", "G_OF"}:
                     boost = 0.72
             elif regime == "optical_velocity":
-                if group == "G_OF_bridge":
+                if group in {"G_OF_bridge", "G_Torso"}:
                     boost = 1.25
                 elif group == "G_OF":
                     boost = 0.88

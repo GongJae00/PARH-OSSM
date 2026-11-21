@@ -5,7 +5,7 @@ import numpy as np
 import cv2 as cv
 from scipy import signal as sps
 from scipy import interpolate as spi
-from components.observations.motion import OF, DoF, profile1D
+from components.observations.motion import OF, DoF, profile1D, torso_shift
 
 
 DOF_BRIDGE_CACHE_FILE = "obs_dof_bridge_v2.npy"
@@ -15,6 +15,7 @@ P1D_BRIDGE_CACHE_FILES = {
 	"cubic": "obs_p1d_cub_bridge_v1.npy",
 }
 P1D_CONSENSUS_CACHE_FILE = "obs_p1d_consensus_v1.npy"
+TORSO_SHIFT_CACHE_FILE = "obs_torso_shift.npy"
 
 
 def _trial_dir(data):
@@ -125,6 +126,24 @@ class OF_Model(MethodBase):
 		of, _ = OF(g_rois, data['fps'])
 		_save_obs_cache(data, "obs_of.npy", of)
 		return of
+
+
+class TorsoShift_Model(MethodBase):
+	"""Face-anchored torso displacement (motion.torso_shift); it reads the video, not the chest ROI strip."""
+
+	def __init__(self):
+		super().__init__()
+		self.name = 'torso_shift'
+		self.data_type = 'chest'
+
+	def process(self, data):
+		cached = _load_obs_cache(data, TORSO_SHIFT_CACHE_FILE)
+		if cached is not None:
+			return cached
+
+		shift = torso_shift(data['video_path'])
+		_save_obs_cache(data, TORSO_SHIFT_CACHE_FILE, shift)
+		return shift
 
 
 class OFDisplacementBridge_Model(MethodBase):

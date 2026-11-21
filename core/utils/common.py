@@ -389,6 +389,20 @@ def average_filter(sig, win_length = 5):
         res.append(1/(1+2*win_length)*window)
     return res
 
+BDF_BELT_FILL = 0.015624  # physical value of the digital fill (16) on the MAHNOB-HCI belt channel
+
+def recorded_belt(belt):
+    """The belt up to its last recorded sample.
+
+    A MAHNOB-HCI BDF file holds whole 1-s data records and fills the rest of the last record with one
+    digital value, read as BDF_BELT_FILL, far from the recorded belt (near -6e4). Band-passing the step
+    into that fill distorts the reference far from the end, so the fill is not part of the belt. A belt
+    that does not end in the fill, such as every COHFACE belt, is returned unchanged.
+    """
+    belt = np.asarray(belt, dtype=float).reshape(-1)
+    fill = int(np.argmin(np.isclose(belt[::-1], BDF_BELT_FILL, rtol=0, atol=1e-6)))
+    return belt[:belt.size - fill]
+
 def filter_RW(sig, fps, lo=0.08, hi=0.5):
     """
     This method performs posptprocessing steps of fiedler methods; the postprocessing process performs on the signal a normalization, computes the gradient of the signal and applies a band-pass filter

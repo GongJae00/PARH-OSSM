@@ -162,3 +162,67 @@ def profile1D(frames, fps, interp_type, align_timebase=False):
     if align_timebase:
         sig = np.concatenate([[0.0], sig.astype(float)])
     return sig, elapsed
+
+
+TORSO_DETECTION_SEC = 5.0
+TORSO_KEYFRAME_SEC = 1.0
+
+
+def _median_face_box(capture, fps, detection_sec):
+    boxes = []
+    with mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5) as detector:
+        for k in range(int(detection_sec * fps)):
+            ok, frame = capture.read()
+            if not ok:
+                break
+            if k % max(1, int(fps / 4)):
+                continue
+            result = detector.process(cv.cvtColor(frame, cv.COLOR_BGR2RGB))
+            if result.detections:
+                b = result.detections[0].location_data.relative_bounding_box
+                boxes.append((b.xmin, b.ymin, b.width, b.height))
+    capture.set(cv.CAP_PROP_POS_FRAMES, 0)
+    return np.median(boxes, axis=0)
+
+
+def torso_shift(video_path):
+    """Vertical displacement (pixels, one value per frame) of the upper torso just below the face.
+
+    Inhalation lifts the shoulders and upper chest. The box is anchored to the face rather than to
+    the shoulder landmarks of the chest ROI, which a head-centred framing (MAHNOB-HCI) pushes below
+    the frame: it spans 2.4 face widths centred on the face and runs from 0.15 face heights below
+    the chin to the frame bottom, keeping at least the lowest tenth of the frame (40 rows or more)
+    when the chin sits near the edge. The face box is the median MediaPipe detection over the first
+    TORSO_DETECTION_SEC seconds, sampled four times a second, and stays fixed for the video.
+
+    Each frame's vertical shift against a keyframe is measured by phase correlation with a Hanning
+    window (sub-pixel, insensitive to a uniform change of brightness). The keyframe is renewed every
+    TORSO_KEYFRAME_SEC seconds and its offset carried over, so measurement errors accumulate once
+    per renewal; summing frame-to-frame shifts instead adds one error per frame, a random walk whose
+    power rises as 1/f^2 into the respiratory band and grows with the frame rate.
+    """
+    capture = cv.VideoCapture(video_path)
+    fps = capture.get(cv.CAP_PROP_FPS)
+    width, height = int(capture.get(cv.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv.CAP_PROP_FRAME_HEIGHT))
+    x, y, w, h = _median_face_box(capture, fps, TORSO_DETECTION_SEC) * [width, height, width, height]
+    left, right = int(max(0, x - 0.7 * w)), int(min(width, x + 1.7 * w))
+    top, bottom = int(max(0, min(y + 1.15 * h, height - max(40, 0.1 * height)))), height
+    window = cv.createHanningWindow((right - left, bottom - top), cv.CV_64F)
+    keyframe_every = max(1, round(TORSO_KEYFRAME_SEC * fps))
+
+    displacement, keyframe, offset = [], None, 0.0
+    while True:
+        ok, frame = capture.read()
+        if not ok:
+            break
+        crop = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)[top:bottom, left:right].astype(np.float64)
+        if keyframe is None:
+            keyframe = crop
+            displacement.append(0.0)
+            continue
+        (_, dy), _ = cv.phaseCorrelate(keyframe, crop, window)
+        displacement.append(offset + dy)
+        if (len(displacement) - 1) % keyframe_every == 0:
+            keyframe, offset = crop, offset + dy
+    capture.release()
+    return np.asarray(displacement)
