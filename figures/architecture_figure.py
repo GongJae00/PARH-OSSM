@@ -31,7 +31,7 @@ from scipy.signal import butter, sosfiltfilt
 
 matplotlib.use("pdf")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from figure_style import (CHEST, GUIDE, INK, MM, NEUTRAL, OBS, PARH, TORSO, draw_share, draw_trace, lighter,  # noqa: E402
+from figure_style import (CHEST, GUIDE, INK, MM, OBS, PARH, TORSO, draw_share, draw_trace, lighter,  # noqa: E402
                           median_z)
 
 plt.rcParams.update({"mathtext.fontset": "custom", "mathtext.rm": "Liberation Sans",
