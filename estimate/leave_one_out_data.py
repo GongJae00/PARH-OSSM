@@ -3,8 +3,10 @@
 Materializing PARH on the copies (estimate/multichannel_fusion.py with the frozen flags) gives PARH with those observations left out of
 the bank and nothing else changed: each removed observation loses its signal row and its per-
 observation OSSM-KF and PARH rows, the rows the materializer reads as that observation's rate track.
-On MAHNOB-HCI only the sessions of the paired analyses are copied: the 37 sessions without P1D keep
-too few observations once a family is removed, and the materializer's strict mode stops on them.
+On MAHNOB-HCI the bank holds the 488 sessions with all eight chest observations
+(evaluation/mahnob_common488_sessions.txt). A bank that also holds the 37 sessions without P1D is limited to
+those 488 with the sessions file, because the 37 keep too few observations once a family is removed and the
+materializer's strict mode stops on them.
 
 usage: leave_one_out_data.py <src_data_dir> <dst_data_dir> <variant> [sessions file]
 """

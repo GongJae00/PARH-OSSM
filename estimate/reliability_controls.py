@@ -4,8 +4,10 @@ The readout (reliability_prior_scope readout_only) weights each observation fami
 GT-free prior of priors_group.csv, one row per trial, family and 30-s window (10-s stride). Two controls
 remove one part of that information each while keeping everything else:
 
-  equal     every family gets the across-family mean of each score in each window, so the readout can
-            no longer prefer one observation over another, but the window-to-window level is kept;
+  equal     every family gets the across-family mean of each numeric column in each window, so the families'
+            prior rows become identical: the readout can no longer prefer one observation over another, but
+            the window-to-window level is kept. The counts in the row are averaged with the scores, and a
+            score missing for one family takes the mean of the families that have it;
   shuffled  each family's windows are permuted within the trial, so each family keeps its own scores and
             its overall level but they no longer line up with the time they were computed for.
 

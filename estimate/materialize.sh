@@ -38,6 +38,7 @@ case $variant in
   no_*)
     python estimate/leave_one_out_data.py "$data" "$out/data" "$variant" $sessions
     data=$out/data ;;
+  *) echo "unknown run: $variant" >&2; exit 1 ;;
 esac
 
 python "$script" --data-dir "$data" --out-run "$out/final" --name parh_ossm --parh-input multichannel \

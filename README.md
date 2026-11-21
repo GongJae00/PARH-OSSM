@@ -114,8 +114,9 @@ order of item 1. A row ending in `__kfstd` holds the OSSM-KF track of one observ
 The code runs on Python 3.10 with the packages in `requirements.txt`. COHFACE
 (<https://www.idiap.ch/en/scientific-research/data/cohface>) and MAHNOB-HCI (<https://mahnob-db.eu/>) are obtained
 from their providers under their access terms and are not redistributed here. Commands run from the repository
-root, and each `<...>` is a folder of your choice. The COHFACE and MAHNOB-HCI steps give the rows of Tables 2 and
-3; the steps after them give the reliability controls and family exclusions, the confirmatory tests on the
+root, and each `<...>` is a folder of your choice. `--no-caches` makes the extraction compute every observation
+from the video even when the dataset folder holds observation files of an earlier run. The COHFACE and MAHNOB-HCI
+steps give the rows of Tables 2 and 3; the steps after them give the reliability controls and family exclusions, the confirmatory tests on the
 MAHNOB-HCI test participants, Table 4, and the Supplementary tables.
 
 ### COHFACE
@@ -125,10 +126,13 @@ it. The reported copies were made with ffmpeg 6.1 under settings that were not r
 `ffmpeg -i data.avi -vsync cfr -r 20 -c:v mpeg4 -q:v 2 data.cfr.avi` makes a copy of the same frame rate and codec,
 though not a byte-identical one.
 
-1. Extract the nine observations from the videos:
+1. Measure the torso displacement on `data.avi`, as the reported runs did, then extract the nine observations:
+   the eight chest observations from `data.cfr.avi` and the torso displacement from that measurement:
    ```
+   python observations/torso_shift_cache.py COHFACE <COHFACE folder> <cohface torso> 8
    python observations/run_shards.py --dataset COHFACE --dataset-root <COHFACE folder> \
-       --config configs/cohface_first_frame_roi.json --work <cohface dir> --shards 8
+       --config configs/cohface_first_frame_roi.json --work <cohface dir> --shards 8 \
+       --torso-cache <cohface torso> --no-caches
    ```
 2. Copy the eight chest observations into a second bank, the input of the chest-only row of Table 2, and compute
    the reliability priors of both banks:
@@ -156,7 +160,7 @@ though not a byte-identical one.
    evaluation/window_rates.sh cohface <cohface dir>/data <cohface runs> <records> 8 - \
        frozen plain_multichannel readout observation_law observability chest_only
    evaluation/bank_rates.sh cohface <cohface dir>/data <records> 8
-   evaluation/main_tables.sh <records> cohface > cohface_table_rows.tex
+   evaluation/main_tables.sh <records> cohface > <records>/cohface_main_tables.tex
    ```
 
 ### MAHNOB-HCI
@@ -173,12 +177,12 @@ writes both when it is given the MAHNOB-HCI folder.
    ```
    python observations/run_shards.py --dataset MAHNOB --dataset-root <MAHNOB-HCI folder> \
        --config configs/mahnob.json --work <mahnob dir> --shards 8 \
-       --trials evaluation/mahnob_common488_sessions.txt
-   python observations/torso_shift_cache.py MAHNOB <MAHNOB-HCI folder> \
-       evaluation/mahnob_subject_split.csv <torso cache> 8
+       --trials evaluation/mahnob_common488_sessions.txt --no-caches
+   python observations/torso_shift_cache.py MAHNOB <MAHNOB-HCI folder> <torso cache> 8 \
+       evaluation/mahnob_common488_sessions.txt
    python observations/torso_config.py configs/mahnob.json <torso dir>/config.json
    python observations/run_shards.py --dataset MAHNOB --dataset-root <MAHNOB-HCI folder> \
-       --config <torso dir>/config.json --work <torso dir> --shards 8 \
+       --config <torso dir>/config.json --work <torso dir> --shards 8 --no-caches \
        --trials evaluation/mahnob_common488_sessions.txt --torso-cache <torso cache>
    python estimate/merge_torso_rows.py <mahnob dir>/data <torso dir>/data <mahnob bank>/data
    ```
@@ -203,7 +207,7 @@ writes both when it is given the MAHNOB-HCI folder.
    evaluation/window_rates.sh mahnob <mahnob dir>/data <mahnob runs> <records> 8 \
        <MAHNOB-HCI folder> frozen plain_multichannel readout observation_law observability w2
    evaluation/bank_rates.sh mahnob <mahnob bank>/data <records> 8
-   evaluation/main_tables.sh <records> mahnob > mahnob_table_rows.tex
+   evaluation/main_tables.sh <records> mahnob > <records>/mahnob_main_tables.tex
    ```
 
 ### Controls, tests, and the Supplementary

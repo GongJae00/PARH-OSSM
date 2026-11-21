@@ -5,11 +5,12 @@
 # when the placement is settled. It reads the CSVs of evaluation/window_rates.sh and evaluation/bank_rates.sh.
 # It then writes the waveform agreement of the frozen run under both placements with the phase-randomized null and the
 # rows of the waveform table, the frozen run's trial means on all 488 trials and its head-motion tertiles on the test
-# trials (onset placement), the slopes of the trial means by stage and of the observation tracks, and the
-# Supplementary tables. The scripts that read the split from <records dir> get a copy of it there.
+# trials (onset placement), the slopes of the trial means by stage and of the observation tracks, the redundancy of
+# the nine observations, and the Supplementary tables. The scripts that read the split from <records dir> get a copy of it there.
 # <base data dir> holds the pickles of observations/extract.py (the eight chest observations), <bank data dir> those
 # of the nine observations (estimate/merge_torso_rows.py), and <final data dir> those of the frozen run of
-# estimate/materialize.sh. The rows of Tables 2 and 3 come from evaluation/main_tables.sh mahnob.
+# estimate/materialize.sh. The Supplementary tables also read the outputs of evaluation/cohface_scores.sh and the
+# rows of Tables 2 and 3, <records dir>/cohface_main_tables.tex and mahnob_main_tables.tex (evaluation/main_tables.sh).
 #
 # usage (from the repository root):
 #   evaluation/mahnob_test_scores.sh <records dir> <out dir> <base data dir> <bank data dir> <final data dir> \
@@ -55,4 +56,5 @@ for reference in hilbert welch count; do
   python evaluation/stage_slopes.py "$records" $reference mahnob test
 done > "$out/mahnob_test_stage_slopes.txt"
 python evaluation/observation_track_slope.py "$records" "$bank" "$final" test "$jobs" > "$out/mahnob_test_observation_track_slope.txt"
+python evaluation/channel_redundancy.py "$bank" "$jobs" > "$records/mahnob_channel_redundancy.csv"
 python evaluation/supplementary_tables.py "$records" "$out"
