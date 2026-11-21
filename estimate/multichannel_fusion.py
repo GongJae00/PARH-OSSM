@@ -233,15 +233,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
-        "--enable-phase-anchor-validation",
-        action="store_true",
-        help=(
-            "Experimental no-go guard: downweight local rate anchors when "
-            "sinusoidal phase-fit/continuity is weak. Off by default because "
-            "the current MAHNOB smoke shows this guard is not yet promotable."
-        ),
-    )
-    p.add_argument(
         "--enable-regime-observation-law",
         action="store_true",
         help=(
@@ -291,13 +282,6 @@ def parse_args() -> argparse.Namespace:
             "lets PARH report rate/BPM from the best supported observation "
             "equation when target-side evidence is strong."
         ),
-    )
-    p.add_argument("--enable-rate-hypothesis-graph", action="store_true", help=argparse.SUPPRESS)
-    p.add_argument(
-        "--enable-rate-hypothesis-graph-v4",
-        dest="enable_rate_hypothesis_graph",
-        action="store_true",
-        help=argparse.SUPPRESS,
     )
     p.add_argument(
         "--enable-rate-posterior",
@@ -1558,8 +1542,6 @@ def _windowed_rate_anchor_runtime(
     min_hz: float,
     max_hz: float,
     signals: Optional[Sequence[np.ndarray]] = None,
-    enable_phase_validation: bool = False,
-    enable_rate_hypothesis_graph_v4: bool = False,
 ) -> Tuple[Optional[List[float]], Optional[List[float]], Dict[str, float]]:
     """Estimate a GT-free local respiratory-rate anchor from windowed group support.
 
@@ -1705,38 +1687,27 @@ def _windowed_rate_anchor_runtime(
             continue
         rate_arr = np.asarray(rates, dtype=np.float64)
         weight_arr = np.asarray(weights, dtype=np.float64)
-        if enable_rate_hypothesis_graph_v4:
-            anchor, anchor_support, anchor_mode, _ = _rate_hypothesis_graph_anchor(
-                rate_arr,
-                weight_arr,
-                groups,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
-        else:
-            anchor, anchor_support, anchor_mode, _, _ = _track_first_rate_anchor(
-                rate_arr,
-                weight_arr,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
+        anchor, anchor_support, anchor_mode, _, _ = _track_first_rate_anchor(
+            rate_arr,
+            weight_arr,
+            min_hz=float(min_hz),
+            max_hz=float(max_hz),
+            rate_ref=rate_ref,
+        )
         if not np.isfinite(anchor):
             continue
-        if not enable_rate_hypothesis_graph_v4:
-            anchor, half_rate_rescued, half_rate_rescue_strength = _group_aware_half_rate_rescue(
-                anchor,
-                rate_arr,
-                weight_arr,
-                groups,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
-            if half_rate_rescued:
-                anchor_mode = "group_aware_half_rate_rescue"
-                anchor_support = max(float(anchor_support), float(half_rate_rescue_strength))
+        anchor, half_rate_rescued, half_rate_rescue_strength = _group_aware_half_rate_rescue(
+            anchor,
+            rate_arr,
+            weight_arr,
+            groups,
+            min_hz=float(min_hz),
+            max_hz=float(max_hz),
+            rate_ref=rate_ref,
+        )
+        if half_rate_rescued:
+            anchor_mode = "group_aware_half_rate_rescue"
+            anchor_support = max(float(anchor_support), float(half_rate_rescue_strength))
         agreement = float(anchor_support)
         norm_w = weight_arr / max(float(np.sum(weight_arr)), 1e-12)
         entropy = float(-np.sum(norm_w * np.log(np.clip(norm_w, 1e-12, 1.0))))
@@ -1784,9 +1755,6 @@ def _windowed_rate_anchor_runtime(
             phase_err = abs(_wrap_phase(anchor_phase - expected))
             temporal_support = float(np.exp(-0.5 * (phase_err / 0.90) ** 2))
 
-        phase_temporal_support = float(np.sqrt(max(phase_support, 0.0) * max(temporal_support, 0.0)))
-        if bool(enable_phase_validation):
-            confidence = float(np.clip(confidence * (0.50 + 0.50 * phase_temporal_support), 0.0, 1.0))
         if confidence <= 0.0:
             continue
         anchor = float(np.clip(anchor, float(min_hz), float(max_hz)))
@@ -1824,7 +1792,7 @@ def _windowed_rate_anchor_runtime(
         "anchor_hz_std": float(np.std(anchor_values)) if anchor_values else float("nan"),
         "phase_support_median": float(np.median(phase_support_values)) if phase_support_values else float("nan"),
         "temporal_support_median": float(np.median(temporal_support_values)) if temporal_support_values else float("nan"),
-        "phase_validation_enabled": bool(enable_phase_validation),
+        "phase_validation_enabled": False,
         "anchor_mode_counts": dict(anchor_mode_counts),
     }
     return anchor_track.tolist(), conf_track.tolist(), meta
@@ -2206,7 +2174,6 @@ def _decoupled_rate_readout_runtime(
     fallback_priors: Dict[str, float],
     min_hz: float,
     max_hz: float,
-    enable_rate_hypothesis_graph_v4: bool = False,
 ) -> Tuple[Optional[List[float]], Optional[List[float]], Dict[str, object]]:
     """GT-free output-rate readout for z_osc.
 
@@ -2371,57 +2338,44 @@ def _decoupled_rate_readout_runtime(
             weight_arr,
             fallback=float(np.nanmedian(rate_arr)),
         )
-        if enable_rate_hypothesis_graph_v4:
-            graph_readout, graph_support, graph_mode, _ = _rate_hypothesis_graph_anchor(
-                rate_arr,
-                weight_arr,
-                group_names,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
-            readout = float(graph_readout if np.isfinite(graph_readout) else direct_readout)
-            mode = str(graph_mode)
-            agreement_support = float(graph_support)
-        else:
-            direct_support = 0.0
-            if np.isfinite(direct_readout):
-                total_weight = max(float(np.sum(weight_arr)), 1e-12)
-                for rate, weight in zip(rate_arr, weight_arr):
-                    direct_support += float(weight) * float(
-                        np.exp(-0.5 * ((float(rate) - float(direct_readout)) / rate_ref) ** 2)
-                    )
-                direct_support /= total_weight
+        direct_support = 0.0
+        if np.isfinite(direct_readout):
+            total_weight = max(float(np.sum(weight_arr)), 1e-12)
+            for rate, weight in zip(rate_arr, weight_arr):
+                direct_support += float(weight) * float(
+                    np.exp(-0.5 * ((float(rate) - float(direct_readout)) / rate_ref) ** 2)
+                )
+            direct_support /= total_weight
 
-            harmonic_anchor, harmonic_support = _harmonic_rate_anchor(
-                rate_arr,
-                weight_arr,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
-            use_harmonic_guard = (
-                np.isfinite(harmonic_anchor)
-                and np.isfinite(direct_readout)
-                and harmonic_anchor < 0.72 * direct_readout
-                and harmonic_support >= direct_support + 0.25
-                and direct_readout >= 0.18
-            )
-            readout = float(harmonic_anchor if use_harmonic_guard else direct_readout)
-            readout, half_rate_rescued, half_rate_rescue_strength = _group_aware_half_rate_rescue(
-                readout,
-                rate_arr,
-                weight_arr,
-                group_names,
-                min_hz=float(min_hz),
-                max_hz=float(max_hz),
-                rate_ref=rate_ref,
-            )
-            mode = "multi_family_harmonic_guard" if use_harmonic_guard else "multi_family_direct"
-            agreement_support = float(harmonic_support if use_harmonic_guard else direct_support)
-            if half_rate_rescued:
-                mode = "group_aware_half_rate_rescue"
-                agreement_support = max(float(agreement_support), float(half_rate_rescue_strength))
+        harmonic_anchor, harmonic_support = _harmonic_rate_anchor(
+            rate_arr,
+            weight_arr,
+            min_hz=float(min_hz),
+            max_hz=float(max_hz),
+            rate_ref=rate_ref,
+        )
+        use_harmonic_guard = (
+            np.isfinite(harmonic_anchor)
+            and np.isfinite(direct_readout)
+            and harmonic_anchor < 0.72 * direct_readout
+            and harmonic_support >= direct_support + 0.25
+            and direct_readout >= 0.18
+        )
+        readout = float(harmonic_anchor if use_harmonic_guard else direct_readout)
+        readout, half_rate_rescued, half_rate_rescue_strength = _group_aware_half_rate_rescue(
+            readout,
+            rate_arr,
+            weight_arr,
+            group_names,
+            min_hz=float(min_hz),
+            max_hz=float(max_hz),
+            rate_ref=rate_ref,
+        )
+        mode = "multi_family_harmonic_guard" if use_harmonic_guard else "multi_family_direct"
+        agreement_support = float(harmonic_support if use_harmonic_guard else direct_support)
+        if half_rate_rescued:
+            mode = "group_aware_half_rate_rescue"
+            agreement_support = max(float(agreement_support), float(half_rate_rescue_strength))
         support_to_anchor = {
             group: float(np.exp(-0.5 * ((float(rate) - readout) / rate_ref) ** 2))
             for group, rate in group_rates.items()
@@ -2462,8 +2416,6 @@ def _decoupled_rate_readout_runtime(
             confidence *= 0.70
         if strongest == "G_OF" and any(g.endswith("_bridge") for g in group_scores):
             confidence *= 0.85
-        if mode == "rate_hypothesis_graph_p1d_half_resolved":
-            confidence *= 1.05
         if confidence <= 0.02:
             continue
 
@@ -4019,8 +3971,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
             float(cfg["min_hz"]),
             float(cfg["max_hz"]),
             signals=stack,
-            enable_phase_validation=bool(cfg.get("enable_phase_anchor_validation", False)),
-            enable_rate_hypothesis_graph_v4=bool(cfg.get("enable_rate_hypothesis_graph", False)),
         )
         output_rate_runtime = None
         output_rate_confidence_runtime = None
@@ -4036,7 +3986,6 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
                 readout_reliability_group_prior,
                 float(cfg["min_hz"]),
                 float(cfg["max_hz"]),
-                enable_rate_hypothesis_graph_v4=bool(cfg.get("enable_rate_hypothesis_graph", False)),
             )
         rate_posterior_runtime = None
         rate_posterior_meta: Dict[str, object] = {"enabled": False}
@@ -4181,7 +4130,7 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
             "rate_posterior_output_source": str(
                 cfg.get("rate_posterior_output_public_source", cfg.get("rate_posterior_output_source", "off"))
             ),
-            "rate_hypothesis_graph_enabled": bool(cfg.get("enable_rate_hypothesis_graph", False)),
+            "rate_hypothesis_graph_enabled": False,
             "derived_consistency_scaling_enabled": False,
             "signal_sqi_observability_enabled": bool(cfg.get("enable_signal_sqi_observability", False)),
             "decoupled_rate_readout_meta": output_rate_meta,
@@ -4309,8 +4258,6 @@ def main() -> int:
         "readout_windowed_reliability_priors_by_video": _load_windowed_reliability_priors(
             args.readout_reliability_group_csv or args.reliability_group_csv
         ),
-        "enable_phase_anchor_validation": bool(args.enable_phase_anchor_validation),
-        "enable_rate_hypothesis_graph": bool(args.enable_rate_hypothesis_graph),
         "enable_rate_posterior": bool(args.enable_rate_posterior),
         "rate_posterior_output_source": rate_output_internal,
         "rate_posterior_output_public_source": rate_output_public,
