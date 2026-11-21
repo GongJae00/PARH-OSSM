@@ -5,7 +5,7 @@ Columns: the four video methods. The values come from rate_agreement.py's trial-
 restricted to the test participants, so its slope, r, bias and limits are computed on those trials. The constant predictor,
 which outputs the cohort rate in every window, appears as a horizontal line in the agreement panels.
 
-usage: rate_agreement_figure.py <records dir> <reference: hilbert|welch|count> <out.pdf>
+usage: rate_agreement_figure.py <records dir> <reference: hilbert|welch|count> <out.pdf> [MAHNOB-HCI split, default test]
 <records dir> holds rate_agreement/, the trial-means CSVs written by evaluation/rate_agreement.py, and the
 MAHNOB-HCI subject split (evaluation/mahnob_subject_split.csv).
 """
@@ -31,9 +31,9 @@ DATASETS = [("COHFACE", "cohface_frozen_trial_means.csv"), ("MAHNOB-HCI", "mahno
 REFERENCE_NAMES = {"hilbert": "Hilbert", "welch": "Welch", "count": "breath-count"}
 
 records_dir, reference, out_path = sys.argv[1:4]
-# MAHNOB-HCI on its test participants only, as in the main Tables 2 and 3
+# MAHNOB-HCI on the evaluated split, the test participants for the main Tables 2 and 3
 split = pd.read_csv(os.path.join(records_dir, "mahnob_subject_split.csv"))
-mahnob_test_trials = set(split[split.split == "test"].trial)
+mahnob_test_trials = set(split[split.split == (sys.argv[4] if len(sys.argv) > 4 else "test")].trial)
 fig, axes = plt.subplots(4, 4, figsize=(183 * MM, 168 * MM))
 
 for d, (dataset, file_name) in enumerate(DATASETS):

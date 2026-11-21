@@ -6,16 +6,14 @@
 #
 # usage (from the repository root):
 #   evaluation/window_rates.sh <dataset: cohface|mahnob> <base data dir> <runs dir> <records dir> <jobs> <MAHNOB-HCI folder | -> <run> ...
-# <base data dir> holds the pickles of observations/extract.py, and <runs dir>/<run>/final/data those of
+# <base data dir> holds the pickles of observations/extract.py (all nine observations, for direct P1D), and <runs dir>/<run>/final/data those of
 # estimate/materialize.sh. Each run gives <records dir>/<dataset>_<name>_window_rates_three_references.csv, plus
-# <dataset>_<name>_onset_window_rates_three_references.csv when a MAHNOB-HCI folder is given; <name> is the run's name,
-# with loo9_ before the leave-one-out runs no_*.
+# <dataset>_<name>_onset_window_rates_three_references.csv when a MAHNOB-HCI folder is given; <name> is the run's name.
 set -e
 dataset=$1; base=$2; runs=$3; records=$4; jobs=$5; mahnob=$6; shift 6
 mkdir -p "$records"
 for run in "$@"; do
   name=$run
-  case $run in no_*) name=loo9_$run ;; esac
   python evaluation/window_rates_three_references.py "$base" "$runs/$run/final/data" "$jobs" \
     > "$records/${dataset}_${name}_window_rates_three_references.csv"
   if [ "$mahnob" != - ]; then

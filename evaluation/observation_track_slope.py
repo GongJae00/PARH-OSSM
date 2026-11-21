@@ -1,10 +1,10 @@
-"""Do the nine observations, before PARH-OSSM combines them, follow the differences in rate between trials?
+"""Do the observations of the bank, before PARH-OSSM combines them, follow the differences in rate between trials?
 
 Per MAHNOB-HCI trial, each observation's OSSM-KF rate track (the `__kfstd` estimate of the per-observation pickle,
 the input of the readout) is averaged over the trial. The least-squares slope of these trial means on the trial-mean
 Hilbert reference (the windows of the frozen onset scoring, at least 10 per trial) is 1 when an observation follows
 the trials and 0 when it sits at one rate; the median of the trial means says where it sits. The same is printed for
-each observation, for the median over the nine, and for the frozen PARH-OSSM track, so they can be set side by side.
+each observation, for the median over the bank, and for the frozen PARH-OSSM track, so they can be set side by side.
 
 usage: observation_track_slope.py <records dir> <per-observation data dir> <frozen final data dir> <evaluated split: development|test> [workers]
 <records dir> holds the CSVs of window_rates.sh and the MAHNOB-HCI subject split.

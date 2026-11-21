@@ -1,11 +1,10 @@
-"""Per-window rates of the median spectral fusion of the nine observations and of torso displacement alone.
+"""Per-window rates of the median spectral fusion of the bank's observations and of torso displacement alone.
 
-The revised PARH reads nine observations, the eight chest observations of the submitted paper and
-torso displacement, so the unweighted multichannel baseline is the per-window median of the nine
-observations' Welch-peak rates, the same median fusion as median_fusion_window_rates.py over the
-same inputs as the method. Torso displacement alone, scored as direct P1D is scored, shows what the
-added observation gives without any fusion. The median over the eight chest observations is kept
-beside them, so these rows can be checked against median_fusion_window_rates.py.
+The bank is whichever of the nine observations the pickles hold, torso displacement included: the five observations
+of PARH-OSSM, or the nine of the extraction. The column median_fusion_bank_bpm is the median over that bank,
+median_fusion_chest_bpm over its chest observations. The unweighted multichannel baseline is this per-window median of
+the observations' Welch-peak rates, over the same inputs as the method. Torso displacement alone, scored as direct P1D
+is scored, shows what that observation gives without any fusion.
 
 Each observation is the signal_hat of its plain estimate in the per-observation pickle; each gets the
 Welch-peak rate per 30-s window with a 1-s stride from t = 0, as window_rates_three_references.py
@@ -35,23 +34,25 @@ def trial_rates(path):
     fps = float(stored["fps"])
     signals = {e["method"]: np.asarray(e["estimate"]["signal_hat"], dtype=float).reshape(-1)
                for e in stored["estimates"] if e["method"] in CHEST_OBSERVATIONS + [TORSO]}
-    rates = {name: welch_rates(s, fps) if s.size and s.std() > 0 else np.array([]) for name, s in signals.items()}
+    bank = [name for name in CHEST_OBSERVATIONS + [TORSO] if name in signals]
+    rates = {name: welch_rates(signals[name], fps) if signals[name].size and signals[name].std() > 0 else np.array([])
+             for name in bank}
     n = max(r.size for r in rates.values())
-    table = np.full((len(CHEST_OBSERVATIONS) + 1, n), np.nan)
-    for row, name in enumerate(CHEST_OBSERVATIONS + [TORSO]):
+    table = np.full((len(bank), n), np.nan)
+    for row, name in enumerate(bank):
         table[row, :rates[name].size] = rates[name]
 
     chest_median = np.nanmedian(table[:-1], axis=0)
-    nine_median = np.nanmedian(table, axis=0)
+    bank_median = np.nanmedian(table, axis=0)
     trial = os.path.basename(path).removesuffix(".pkl")
-    return [(trial, w, nine_median[w], chest_median[w], table[-1, w]) for w in range(n)]
+    return [(trial, w, bank_median[w], chest_median[w], table[-1, w]) for w in range(n)]
 
 
 if __name__ == "__main__":
     root, workers = sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 1
     paths = [os.path.join(root, f) for f in sorted(os.listdir(root)) if f.endswith(".pkl")]
     out = csv.writer(sys.stdout)
-    out.writerow(["trial", "window", "median_fusion_nine_bpm", "median_fusion_chest_bpm", "direct_torso_bpm"])
+    out.writerow(["trial", "window", "median_fusion_bank_bpm", "median_fusion_chest_bpm", "direct_torso_bpm"])
     with Pool(workers) as pool:
         for rows in pool.imap(trial_rates, paths):
             out.writerows((t, w, *(f"{v:.4f}" for v in values)) for t, w, *values in rows)

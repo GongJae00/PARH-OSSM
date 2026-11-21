@@ -3,7 +3,7 @@
 Columns: a COHFACE trial and a MAHNOB-HCI development trial, each the trial whose PARH-OSSM MAE against the
 Hilbert reference (scored as main_tables.py scores it) is closest to the median over that dataset's
 development trials, so neither case is chosen for looking good and no test subject is read. Rows:
-- the nine observations and the belt, each band-passed to 0.08-0.5 Hz as the evaluation filters the belt, centred
+- the five observations of the bank and the belt, each band-passed to 0.08-0.5 Hz as the evaluation filters the belt, centred
   on its median and scaled by its median absolute deviation, so that the filter's start-up and the end of a belt
   record do not set the scale; for display, values beyond about 2 are compressed smoothly toward 3
   (3 tanh(z / 3)), so that a motion burst does not hide the neighbouring traces; the samples more than 4
@@ -42,9 +42,8 @@ from figure_style import INK, MM, NEUTRAL, OSSM, PARH
 matplotlib.use("pdf")
 WIN, MIN_WINDOWS, MIN_HZ, MAX_HZ = 30, 10, 0.08, 0.5
 OBSERVATION_START_SEC = 2.0
-OBSERVATIONS = [("of_farneback", "OF"), ("of_disp_bridge", "OF bridge"), ("DoF", "DoF"), ("dof_disp_bridge", "DoF bridge"),
-                ("profile1D linear", "P1D linear"), ("profile1D quadratic", "P1D quadratic"), ("profile1D cubic", "P1D cubic"),
-                ("profile1d_consensus", "P1D consensus"), ("torso_shift", "Torso displacement")]
+OBSERVATIONS = [("of_farneback", "OF"), ("DoF", "DoF"), ("dof_disp_bridge", "DoF bridge"), ("profile1D quadratic", "P1D"),
+                ("torso_shift", "Torso displacement")]
 TRUST = LinearSegmentedColormap.from_list("trust", ["#f2f6fc", "#1d4f91"])
 BEYOND = 4
 LIGHTER = {INK: "#b4b4b4", NEUTRAL: "#d2d2d2", PARH: "#a8bfdf"}
@@ -100,9 +99,9 @@ rate_limits = [(min(c["windows"][rate_columns].min().min(), c["constant"]),
                 max(c["windows"][rate_columns].max().max(), c["constant"])) for c in cases]
 rate_span = np.ceil(max(high - low for low, high in rate_limits)) + 1
 
-fig = plt.figure(figsize=(TEXT_WIDTH_MM * MM, 148 * MM))
-grid = fig.add_gridspec(4, 3, height_ratios=[2.5, 1.15, 0.9, 1.2], width_ratios=[1, 1, 0.025],
-                        hspace=0.28, wspace=0.14, left=0.12, right=0.935, top=0.95, bottom=0.06)
+fig = plt.figure(figsize=(TEXT_WIDTH_MM * MM, 126 * MM))
+grid = fig.add_gridspec(4, 3, height_ratios=[1.75, 0.8, 0.9, 1.2], width_ratios=[1, 1, 0.025],
+                        hspace=0.3, wspace=0.14, left=0.12, right=0.935, top=0.945, bottom=0.07)
 for column, case in enumerate(cases):
     estimate = case["final"]["estimates"][0]["estimate"]
     fps, fs_gt = float(case["final"]["fps"]), float(case["final"]["fs_gt"])

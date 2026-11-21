@@ -1,7 +1,7 @@
 """Rows of the Supplementary parameter table, read from the code that produced the reported runs.
 
-Each value is read from a fresh PARH-OSSM head (the materializer builds the head without parameters, and
-the pickle meta of the frozen runs carries the same values) or
+Each value is read from a fresh PARH-OSSM head (the materializer builds the head without parameters and
+the runs set no RESPYRE_PARH_* override; the pickle meta of the frozen runs carries the same values) or
 from the materializer module, so the typeset table cannot drift from the code. The last column names the
 constants or parameter fields in the code, which stay findable when lines move. The last block lists the
 terms the code defines but
@@ -49,13 +49,13 @@ ROWS = [
     ("Target observability and nuisance", "", "floor of the observability factor on frame quality and on the frequency-change score", "head", ("TARGET_OBS_TRUST_FLOOR", "TARGET_OBS_QDYN_FLOOR")),
     ("Target observability and nuisance", "", "residual identifiability gate: floor of its trust and observability factors, scale of its nuisance factor", "head", ("RESIDUAL_GUARD_TRUST_FLOOR", "RESIDUAL_GUARD_NUISANCE_SCALE")),
     ("Oscillator frequency", "", "update interval (s), confirmations needed, largest step (Hz)", "head", ("FREQ_UPDATE_INTERVAL_SEC", "FREQ_CONFIRM_COUNT", "FREQ_MAX_STEP_HZ")),
-    ("Oscillator frequency", "", "window of the helper-frequency median (s)", "head", ("FREQ_RESCUE_WINDOW_SEC",)),
+    ("Oscillator frequency", "", "window of the candidate-frequency median (s)", "head", ("FREQ_RESCUE_WINDOW_SEC",)),
+    ("Oscillator frequency", "", "update toward a departing consensus: largest consensus s.d. (Hz), minimum helper support, minimum frequency-change score, minimum departure (Hz), confirmations needed, largest step (Hz)", "head", ("FREQ_RESCUE_HELPER_STD_MAX_HZ", "FREQ_RESCUE_MIN_SUPPORT", "FREQ_RESCUE_MIN_QDYN", "FREQ_RESCUE_MIN_MISMATCH_HZ", "FREQ_RESCUE_CONFIRM_COUNT", "FREQ_RESCUE_MAX_STEP_HZ")),
     ("Oscillator frequency", "", "helper frequency: window of the rate-observability scores (s), blend, largest step (Hz)", "head", ("RATE_OBS_WINDOW_SEC", "RATE_OBS_HELPER_BLEND", "RATE_OBS_HELPER_MAX_STEP_HZ")),
     ("Warm-up calibration", "", "warm-up window and skipped start (s)", "head", ("OBS_CAL_WARMUP_SEC", "OBS_CAL_SKIP_SEC")),
     ("Warm-up calibration", "", "ridge penalty of the gain fit", "head", ("OBS_CAL_RIDGE",)),
     ("Warm-up calibration", "", "acceptance: minimum fit correlation, maximum normalized RMSE", "head", ("OBS_CAL_MIN_FIT_CORR", "OBS_CAL_MAX_FIT_RMSE_NORM")),
-    ("Warm-up calibration", "", "P1D quadratic and cubic: largest first- and second-harmonic gain, prior strength, largest lag (s)", "warmup:profile1d_quadratic", WARMUP_FIELDS),
-    ("Warm-up calibration", "", "P1D consensus: the same four values", "warmup:profile1d_consensus", WARMUP_FIELDS),
+    ("Warm-up calibration", "", "P1D: largest first- and second-harmonic gain, prior strength, largest lag (s)", "warmup:profile1d_quadratic", WARMUP_FIELDS),
     ("Rate readout", "", "family prior of the per-window readout score", "materializer", ("RATE_TIMING_GROUP_PRIOR",)),
     ("Rate readout", "", "OF helper blend of the state rate: weight, minimum helper support, minimum frequency-change score, minimum mismatch (Hz)", "head", ("OUTPUT_RATE_BLEND_ALPHA", "OUTPUT_RATE_MIN_SUPPORT", "OUTPUT_RATE_MIN_QDYN", "OUTPUT_RATE_MIN_MISMATCH_HZ")),
     ("Rate readout", "", "largest blend of the phase-anchored waveform readout", "head", ("PHASE_MORPH_MAX_BLEND",)),
@@ -68,16 +68,15 @@ ROWS = [
 
 SOURCES = {"head": head, "params": head.params, "materializer": materializer}
 
-# Readout groups of the materializer under the observation names of the paper
-# (scripts/extract_target_reliability_graph_features.py maps each observation to its group).
-GROUP_NAMES = {"G_OF": "OF", "G_OF_bridge": "OF bridge", "G_DoF": "DoF", "G_DoF_bridge": "DoF bridge",
-               "G_P1D_low": "P1D linear", "G_P1D_morph": "P1D quadratic and cubic", "G_P1D_cons": "P1D consensus",
-               "G_Torso": "torso"}
+# Readout groups of the five observations of the bank, under their names in the paper
+# (estimate/reliability_priors.py maps each observation to its group); the code also
+# defines priors for the groups of the observations the bank leaves out, which no reported run reads.
+GROUP_NAMES = {"G_OF": "OF", "G_DoF": "DoF", "G_DoF_bridge": "DoF bridge", "G_P1D_morph": "P1D", "G_Torso": "torso"}
 
 
 def value_text(value):
     if isinstance(value, dict):
-        return ", ".join(f"{GROUP_NAMES[group]} {weight:g}" for group, weight in value.items())
+        return ", ".join(f"{GROUP_NAMES[group]} {weight:g}" for group, weight in value.items() if group in GROUP_NAMES)
     return f"{value:g}"
 
 

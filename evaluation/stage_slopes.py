@@ -41,11 +41,11 @@ windows = windows[windows.trial.isin(windows.dropna(subset=["direct_p1d_welch_bp
 references = windows[["trial", "window", f"{reference}_reference_bpm"]]
 fused = pd.read_csv(os.path.join(records_dir, fusion))
 sources = [("Direct P1D quadratic", windows, "direct_p1d_welch_bpm"), ("Direct torso displacement", fused, "direct_torso_bpm"),
-           ("Median fusion", fused, "median_fusion_nine_bpm"), ("OSSM-KF", windows, "ossm_kf_track_bpm")]
+           ("Median fusion", fused, "median_fusion_bank_bpm"), ("OSSM-KF", windows, "ossm_kf_track_bpm")]
 sources += [(stage, pd.read_csv(os.path.join(records_dir, stage_csv.format(stage))), "parh_track_bpm") for stage in STAGES]
 sources += [("PARH-OSSM", windows, "parh_track_bpm")]
-# PARH-OSSM with the torso observation left out of the bank (the leave-one-out run no_torso), the same flags and priors
-sources += [("PARH-OSSM without torso", pd.read_csv(os.path.join(records_dir, stage_csv.format("loo9_no_torso"))), "parh_track_bpm")]
+# PARH-OSSM with the torso observation left out of the bank (the route exclusion no_torso), the same flags and priors
+sources += [("PARH-OSSM without torso", pd.read_csv(os.path.join(records_dir, stage_csv.format("no_torso"))), "parh_track_bpm")]
 
 print(f"{dataset}, {reference} reference: trials, slope and Pearson r of trial-mean estimate on trial-mean reference, "
       f"SD and median of trial means (estimate / reference, bpm)")

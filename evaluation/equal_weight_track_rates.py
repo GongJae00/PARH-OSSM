@@ -1,15 +1,18 @@
-"""Per-window rate of the nine observations' OSSM-KF rate tracks combined without weights.
+"""Per-window rate of the bank's OSSM-KF rate tracks combined without weights.
+
+The bank is whichever of OBSERVATION_TRACKS the pickles hold: the five observations of PARH-OSSM, or the nine
+of the extraction.
 
 The PARH readout combines the observations' OSSM-KF tracks (external rate evidence ossm_kfstd) with
 reliability weights; this control gives every observation the same weight, as the quality-weighting
-comparisons of Nguyen et al. 2026 do. At each frame the rate is the mean of the nine tracks, and each
+comparisons of Nguyen et al. 2026 do. At each frame the rate is the mean of the tracks, and each
 30-s window with a 1-s stride from t = 0 gets the mean of that rate, as window_rates_three_references.py
 windows a track. A second, robust combination (descriptive, added after the declaration) takes each track's
-median over the window and then the median over the nine tracks, which is the PARH readout's weighted median
+median over the window and then the median over the tracks, which is the PARH readout's weighted median
 across families without its weights. Neither estimate reads the reference, so its windows serve either belt
 placement.
 
-usage: equal_weight_track_rates.py <frozen data dir with the nine-family pickles> [workers] > <dataset>_equal_weight_track_rates.csv
+usage: equal_weight_track_rates.py <bank data dir> [workers] > <dataset>_equal_weight_track_rates.csv
 """
 import csv
 import os
@@ -29,7 +32,8 @@ def equal_weight_rates(path):
     with open(path, "rb") as f:
         payload = pickle.load(f)
     estimates = {e["method"]: e["estimate"] for e in payload["estimates"]}
-    tracks = [np.asarray(estimates[name]["track_hz"], dtype=float).reshape(-1) for name in OBSERVATION_TRACKS]
+    tracks = [np.asarray(estimates[name]["track_hz"], dtype=float).reshape(-1) for name in OBSERVATION_TRACKS
+              if name in estimates]
     n_frames = min(track.size for track in tracks)
     track_bpm = 60.0 * np.vstack([track[:n_frames] for track in tracks])
     mean_track_bpm = np.nanmean(track_bpm, axis=0)

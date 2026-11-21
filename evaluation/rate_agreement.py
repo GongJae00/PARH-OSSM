@@ -1,7 +1,7 @@
 """Agreement of the trial-mean rate with the reference (scatter, Bland-Altman, rate terciles).
 
 Every method is scored against each of the three reference definitions on the same windows
-(window_rates_three_references.py, plus median_fusion_window_rates.py). Per trial and reference,
+(window_rates_three_references.py, plus observation_fusion_window_rates.py). Per trial and reference,
 the estimate and the reference are averaged over the windows where both exist, with at least 10 such
 windows; the per-trial MAE is the mean |estimate - reference| over those windows. The constant
 predictor outputs, in every window, the median trial-mean reference rate of the development trials, as in
@@ -13,7 +13,7 @@ Agreement is between trial means: the least-squares slope and Pearson r of the e
 reference, and the Bland-Altman bias (estimate minus reference) with limits of agreement at
 bias +/- 1.96 SD. Terciles split the trials by their trial-mean reference rate, per reference.
 
-usage: rate_agreement.py <dataset name> <window-rate csv> <median fusion csv>:<column> <trial-means csv out> [split csv]
+usage: rate_agreement.py <dataset name> <window-rate csv> <median fusion csv>:<column> <trial-means csv out> [split csv [evaluated split: only its trials are scored]]
 """
 import sys
 
@@ -35,6 +35,8 @@ trial_reference = windows.groupby("trial")[[f"{r}_reference_bpm" for r in REFERE
 if len(sys.argv) > 5:
     split = pd.read_csv(sys.argv[5])
     development_reference = trial_reference[trial_reference.index.isin(split[split.split == "development"].trial)]
+    if len(sys.argv) > 6:
+        windows = windows[windows.trial.isin(split[split.split == sys.argv[6]].trial)]
 else:
     development_reference = trial_reference
 rows = []

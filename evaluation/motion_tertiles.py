@@ -14,7 +14,7 @@ With a split csv (MAHNOB-HCI), the constant comes from the development trials an
 scored and split into tertiles; without one (COHFACE), every trial is development data and is scored. The
 per-trial motion, tertile, and MAE go to a CSV for the Supplementary table.
 
-usage: motion_tertiles.py <dataset name> <window-rate csv> <head_motion_trials.csv> <trial csv out> [split csv]
+usage: motion_tertiles.py <dataset name> <window-rate csv> <head_motion_trials.csv> <trial csv out> [split csv [evaluated split, default test]]
 """
 import sys
 
@@ -38,7 +38,7 @@ cohort_rate = trial_means.median()
 if len(sys.argv) > 5:
     split = pd.read_csv(sys.argv[5])
     cohort_rate = trial_means[trial_means.index.isin(split[split.split == "development"].trial)].median()
-    windows = windows[windows.trial.isin(split[split.split == "test"].trial)]
+    windows = windows[windows.trial.isin(split[split.split == (sys.argv[6] if len(sys.argv) > 6 else "test")].trial)]
 rows = []
 for trial, w in windows.groupby("trial"):
     for r in REFERENCES:
