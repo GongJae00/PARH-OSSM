@@ -106,10 +106,13 @@ with open(os.path.join(out_dir, "S_perturbation.tex"), "w") as f:
 # pairs of the bank's different measurements pooled by route; trials with a flat observation are left out.
 REDUNDANCY_ROWS = [
     ("One measurement", [
-        ("P1D quadratic and cubic", [("profile1D quadratic", "profile1D cubic")]),
         ("OF and OF bridge", [("of_farneback", "of_disp_bridge")]),
+        ("P1D quadratic and cubic", [("profile1D quadratic", "profile1D cubic")]),
         ("P1D quadratic and consensus", [("profile1D quadratic", "profile1d_consensus")]),
-        ("P1D linear and quadratic", [("profile1D linear", "profile1D quadratic")])]),
+        ("P1D cubic and consensus", [("profile1D cubic", "profile1d_consensus")]),
+        ("P1D linear and quadratic", [("profile1D linear", "profile1D quadratic")]),
+        ("P1D linear and cubic", [("profile1D linear", "profile1D cubic")]),
+        ("P1D linear and consensus", [("profile1D linear", "profile1d_consensus")])]),
     ("Two statistics of one frame difference", [
         ("DoF and DoF bridge", [("DoF", "dof_disp_bridge")])]),
     ("Different measurements", [
