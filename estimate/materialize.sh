@@ -10,9 +10,9 @@
 #   equal_readout       control: readout priors equal across observations in each window
 #   shuffled_readout    control: each observation's prior windows permuted within the trial
 #   equal_filter        control: the filter's per-observation trust replaced by its mean over observations
-#   no_<route>          (the names of ROUTES in estimate/bank.py: no_of no_dof no_p1d no_torso for the five-observation bank)
+#   no_<route>          (the names of ROUTES in estimate/bank.py: no_of no_p1d no_torso for the three-observation bank)
 #                       route exclusion: the frozen method on a copy of the bank's pickles without that
-#                       measurement route (no_of: OF; no_dof: DoF and the DoF bridge; no_p1d: P1D quadratic;
+#                       measurement route (no_of: OF; no_p1d: P1D quadratic;
 #                       no_torso: torso displacement), with the priors of the full bank
 #
 # usage (from the repository root):

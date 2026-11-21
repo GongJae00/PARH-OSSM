@@ -1,6 +1,6 @@
 """Per-window rate of the bank's OSSM-KF rate tracks combined without weights.
 
-The bank is whichever of OBSERVATION_TRACKS the pickles hold: the five observations of PARH-OSSM, or the nine
+The bank is whichever of OBSERVATION_TRACKS the pickles hold: the three observations of PARH-OSSM, or the nine
 of the extraction.
 
 The PARH readout combines the observations' OSSM-KF tracks (external rate evidence ossm_kfstd) with

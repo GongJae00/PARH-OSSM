@@ -27,11 +27,11 @@ from scipy.stats import false_discovery_control
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
-from bank import ROUTES as ROUTE_ROWS
+from bank import ADDED_BACK, ROUTES as ROUTE_ROWS
 from reliability_controls_summary import compare
 
 records_dir, out_dir, MAHNOB_EVALUATED, ROUTES = sys.argv[1:5]
-ROUTE_NAMES = {name: row for name, (_, row) in ROUTE_ROWS.items()}
+ROUTE_NAMES = {name: row for name, (_, row) in {**ROUTE_ROWS, **ADDED_BACK}.items()}
 REFERENCES = [("hilbert", "Hilbert"), ("welch", "Welch"), ("count", "Breath count")]
 METHODS = [("direct_p1d_welch", "Direct P1D quadratic"), ("median_fusion", "Median fusion"),
            ("ossm_kf_track", "OSSM-KF"), ("parh_track", "PARH-OSSM"), ("constant", "Constant predictor")]

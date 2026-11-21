@@ -4,7 +4,7 @@
 # equal-weight control).
 #
 # usage (from the repository root): evaluation/bank_rates.sh <dataset: cohface|mahnob> <bank data dir> <records dir> <jobs>
-# <bank data dir> holds the pickles of the five observations (estimate/drop_observations.py bank).
+# <bank data dir> holds the pickles of the three observations (estimate/drop_observations.py bank).
 set -e
 dataset=$1; bank=$2; records=$3; jobs=$4
 mkdir -p "$records"

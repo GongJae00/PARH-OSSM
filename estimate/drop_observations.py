@@ -2,7 +2,8 @@
 
 The bank of PARH-OSSM is defined in bank.py. Extraction computes nine observations; `bank` removes those the bank
 does not hold from every pickle, with each removed observation's
-signal row and its OSSM-KF and PARH rows, the rows the materializer reads as that observation's rate track. A route
+signal row and its OSSM-KF and PARH rows, the rows the materializer reads as that observation's rate track. An added-back
+run (the names of bank.ADDED_BACK) removes only the observations that stay out of the enlarged bank. A route
 exclusion (the names of bank.ROUTES) is applied to the copy of the bank and removes one measurement
 route from it, and `chest_only` removes torso displacement from the nine, which leaves the eight chest observations
 of the submitted method. `drop:<label>,<label>,...` removes the observations of the labels given.
@@ -14,9 +15,10 @@ import pickle
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bank import DROPPED, NINE, ROUTES
+from bank import ADDED_BACK, DROPPED, NINE, ROUTES
 
-VARIANTS = {"bank": DROPPED, "chest_only": ["torso_shift"], **{name: labels for name, (labels, _) in ROUTES.items()}}
+VARIANTS = {"bank": DROPPED, "chest_only": ["torso_shift"], **{name: labels for name, (labels, _) in ROUTES.items()},
+            **{name: [x for x in DROPPED if x not in labels] for name, (labels, _) in ADDED_BACK.items()}}
 
 src, dst, variant = sys.argv[1:4]
 labels = variant.removeprefix("drop:").split(",") if variant.startswith("drop:") else VARIANTS[variant]

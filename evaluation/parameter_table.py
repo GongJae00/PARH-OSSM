@@ -68,10 +68,10 @@ ROWS = [
 
 SOURCES = {"head": head, "params": head.params, "materializer": materializer}
 
-# Readout groups of the five observations of the bank, under their names in the paper
+# Readout groups of the three observations of the bank, under their names in the paper
 # (estimate/reliability_priors.py maps each observation to its group); the code also
 # defines priors for the groups of the observations the bank leaves out, which no reported run reads.
-GROUP_NAMES = {"G_OF": "OF", "G_DoF": "DoF", "G_DoF_bridge": "DoF bridge", "G_P1D_morph": "P1D", "G_Torso": "torso"}
+GROUP_NAMES = {"G_OF": "OF", "G_P1D_morph": "P1D", "G_Torso": "torso"}
 
 
 def value_text(value):

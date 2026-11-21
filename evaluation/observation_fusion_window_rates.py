@@ -1,6 +1,6 @@
 """Per-window rates of the median spectral fusion of the bank's observations and of torso displacement alone.
 
-The bank is whichever of the nine observations the pickles hold, torso displacement included: the five observations
+The bank is whichever of the nine observations the pickles hold, torso displacement included: the three observations
 of PARH-OSSM, or the nine of the extraction. The column median_fusion_bank_bpm is the median over that bank,
 median_fusion_chest_bpm over its chest observations. The unweighted multichannel baseline is this per-window median of
 the observations' Welch-peak rates, over the same inputs as the method. Torso displacement alone, scored as direct P1D

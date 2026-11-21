@@ -7,7 +7,8 @@ ESTIMATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estim
 
 NINE = ["of_farneback", "of_disp_bridge", "DoF", "dof_disp_bridge", "profile1D linear", "profile1D quadratic",
         "profile1D cubic", "profile1d_consensus", "torso_shift"]
-BANK = ["of_farneback", "DoF", "dof_disp_bridge", "profile1D quadratic", "torso_shift"]
+BANK = ["of_farneback", "profile1D quadratic", "torso_shift"]
+WITH_DOF = ["of_farneback", "DoF", "dof_disp_bridge", "profile1D quadratic", "torso_shift"]
 
 
 def estimates(observations):
@@ -29,7 +30,7 @@ def drop(tmp_path, source_methods, variant):
         return [e["method"] for e in pickle.load(f)["estimates"]]
 
 
-def test_bank_keeps_the_five_observations_with_their_filter_rows(tmp_path):
+def test_bank_keeps_the_three_observations_with_their_filter_rows(tmp_path):
     kept = drop(tmp_path, estimates(NINE), "bank")
 
     assert kept == [m["method"] for m in estimates(BANK)]
@@ -38,8 +39,12 @@ def test_bank_keeps_the_five_observations_with_their_filter_rows(tmp_path):
 def test_route_exclusion_removes_a_measurement_route_from_the_bank(tmp_path):
     bank = estimates(BANK)
 
-    assert drop(tmp_path, bank, "no_dof") == [m["method"] for m in estimates(["of_farneback", "profile1D quadratic", "torso_shift"])]
+    assert drop(tmp_path, bank, "no_of") == [m["method"] for m in estimates(BANK[1:])]
     assert drop(tmp_path, bank, "no_torso") == [m["method"] for m in estimates(BANK[:-1])]
+
+
+def test_added_back_run_keeps_the_bank_and_the_frame_difference_statistics(tmp_path):
+    assert drop(tmp_path, estimates(NINE), "with_dof") == [m["method"] for m in estimates(WITH_DOF)]
 
 
 def test_chest_only_keeps_the_eight_chest_observations(tmp_path):

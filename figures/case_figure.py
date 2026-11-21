@@ -3,7 +3,7 @@
 Columns: a COHFACE trial and a MAHNOB-HCI development trial, each the trial whose PARH-OSSM MAE against the
 Hilbert reference (scored as main_tables.py scores it) is closest to the median over that dataset's
 development trials, so neither case is chosen for looking good and no test subject is read. Rows:
-- the five observations of the bank and the belt, each band-passed to 0.08-0.5 Hz as the evaluation filters the belt, centred
+- the three observations of the bank and the belt, each band-passed to 0.08-0.5 Hz as the evaluation filters the belt, centred
   on its median and scaled by its median absolute deviation, so that the filter's start-up and the end of a belt
   record do not set the scale; for display, values beyond about 2 are compressed smoothly toward 3
   (3 tanh(z / 3)), so that a motion burst does not hide the neighbouring traces; the samples more than 4
@@ -11,8 +11,8 @@ development trials, so neither case is chosen for looking good and no test subje
   from 2 s on: their first frames carry the initialisation step of the extraction (in COHFACE up to 150 times the
   later spread), which the filter would spread over several seconds, and the observation calibration of the method
   skips the same 2 s (OBS_CAL_SKIP_SEC in parh_ossm.py);
-- the trust pi of each observation in the filter (diagnostics pi_t_channels), on one colour scale for both that
-  spans every value of the two trials;
+- the share of each observation in the Kalman update, w_k = (1 / R_eff,k) / sum_j (1 / R_eff,j) from the effective
+  measurement-noise variances of the filter (diagnostics R_eff_t_channels), as in Fig. 1, on a 0-1 scale;
 - the output waveform that the waveform metrics score (z_full_smoothed, as bounded_lag_waveform.py reads it) and
   the belt, scaled the same way, without any lag or sign correction;
 - the window rates that the tables score: the Hilbert reference, PARH-OSSM, the single-observation OSSM-KF,
@@ -22,6 +22,7 @@ usage: case_figure.py <COHFACE window rates csv> <COHFACE final dir> <COHFACE ob
                       <MAHNOB-HCI window rates csv> <MAHNOB-HCI final dir> <MAHNOB-HCI observation dir>
                       <split csv> <out.pdf>
 """
+import json
 import os
 import pickle
 import sys
@@ -35,16 +36,17 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib.transforms import offset_copy
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from evaluation.belt_reference import filter_RW, recorded_belt
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
 from bank import BANK
 from figure_style import INK, MM, NEUTRAL, OSSM, PARH
 
 matplotlib.use("pdf")
 WIN, MIN_WINDOWS, MIN_HZ, MAX_HZ = 30, 10, 0.08, 0.5
 OBSERVATION_START_SEC = 2.0
-OBSERVATIONS = list(BANK.items())
+# (signal in the observation file, family in the filter's channel order, label)
+OBSERVATIONS = [(label, label.lower().replace(" ", "_"), name) for label, name in BANK.items()]
 TRUST = LinearSegmentedColormap.from_list("trust", ["#f2f6fc", "#1d4f91"])
 BEYOND = 4
 LIGHTER = {INK: "#b4b4b4", NEUTRAL: "#d2d2d2", PARH: "#a8bfdf"}
@@ -92,16 +94,13 @@ for name, csv_path, final_dir, observation_dir in [("COHFACE", cohface_csv, cohf
                       windows=trial_windows, final=final, observations=observations))
     print(f"{name}: {trial}, PARH-OSSM Hilbert MAE {trial_mae:.3f} bpm, median over {n_trials} trials {median_mae:.3f}")
 
-trust_values = np.concatenate([np.asarray(c["final"]["estimates"][0]["estimate"]["diagnostics"]["pi_t_channels"]).ravel()
-                               for c in cases])
-trust_range = (np.floor(trust_values.min() * 100) / 100, np.ceil(trust_values.max() * 100) / 100)
 rate_columns = ["hilbert_reference_bpm", "parh_track_bpm", "ossm_kf_track_bpm"]
 rate_limits = [(min(c["windows"][rate_columns].min().min(), c["constant"]),
                 max(c["windows"][rate_columns].max().max(), c["constant"])) for c in cases]
 rate_span = np.ceil(max(high - low for low, high in rate_limits)) + 1
 
-fig = plt.figure(figsize=(TEXT_WIDTH_MM * MM, 126 * MM))
-grid = fig.add_gridspec(4, 3, height_ratios=[1.75, 0.8, 0.9, 1.2], width_ratios=[1, 1, 0.025],
+fig = plt.figure(figsize=(TEXT_WIDTH_MM * MM, 116 * MM))
+grid = fig.add_gridspec(4, 3, height_ratios=[1.3, 0.55, 0.9, 1.2], width_ratios=[1, 1, 0.025],
                         hspace=0.3, wspace=0.14, left=0.12, right=0.935, top=0.945, bottom=0.07)
 for column, case in enumerate(cases):
     estimate = case["final"]["estimates"][0]["estimate"]
@@ -116,13 +115,13 @@ for column, case in enumerate(cases):
     traces = fig.add_subplot(grid[0, column])
     plot_scaled(traces, belt_time[shown], belt[shown], INK, gain=0.4)
     start = int(OBSERVATION_START_SEC * fps)
-    for row, (method, _) in enumerate(OBSERVATIONS, start=1):
+    for row, (method, _, _) in enumerate(OBSERVATIONS, start=1):
         observation = case["observations"][method][start:n_video]
         observation = filter_RW(observation, fps, lo=MIN_HZ, hi=MAX_HZ).reshape(-1) if observation.std() > 0 else observation
         plot_scaled(traces, video_time[start:start + observation.size], observation, NEUTRAL, offset=-row * 1.6, gain=0.4,
                     lw=0.45)
     traces.set_yticks([-row * 1.6 for row in range(len(OBSERVATIONS) + 1)])
-    traces.set_yticklabels(["Belt"] + [label for _, label in OBSERVATIONS] if column == 0 else [])
+    traces.set_yticklabels(["Belt"] + [label for _, _, label in OBSERVATIONS] if column == 0 else [])
     traces.tick_params(axis="y", length=0)
     traces.spines["left"].set_visible(False)
     traces.set(xlim=span, ylim=(-len(OBSERVATIONS) * 1.6 - 1.3, 1.3), xticklabels=[])
@@ -133,12 +132,15 @@ for column, case in enumerate(cases):
     traces.text(-0.16 if column == 0 else -0.06, 1, "ab"[column], transform=heading, va="baseline", fontsize=8,
                 fontweight="bold")
 
+    precision = 1.0 / np.asarray(estimate["diagnostics"]["R_eff_t_channels"], dtype=float)
+    update_share = precision / precision.sum(axis=0)
+    families = json.loads(estimate["meta"])["observation_families"]
+    update_share = update_share[[families.index(family) for _, family, _ in OBSERVATIONS]]
     trust = fig.add_subplot(grid[1, column])
-    image = trust.imshow(np.asarray(estimate["diagnostics"]["pi_t_channels"]), aspect="auto", cmap=TRUST,
-                         vmin=trust_range[0], vmax=trust_range[1], extent=(0, video_time[-1], len(OBSERVATIONS) - 0.5, -0.5),
-                         interpolation="nearest")
+    image = trust.imshow(update_share, aspect="auto", cmap=TRUST, vmin=0, vmax=1,
+                         extent=(0, video_time[-1], len(OBSERVATIONS) - 0.5, -0.5), interpolation="nearest")
     trust.set_yticks(range(len(OBSERVATIONS)))
-    trust.set_yticklabels([label for _, label in OBSERVATIONS] if column == 0 else [])
+    trust.set_yticklabels([label for _, _, label in OBSERVATIONS] if column == 0 else [])
     trust.tick_params(axis="y", length=0)
     trust.set(xlim=span, xticklabels=[])
     for side in ("left", "bottom"):
@@ -167,9 +169,9 @@ for column, case in enumerate(cases):
                     handlelength=1.0, columnspacing=0.8, borderaxespad=0)
 
 colorbar = fig.colorbar(image, cax=fig.add_subplot(grid[1, 2]))
-colorbar.set_label("Trust $\\pi$")
+colorbar.set_label("Update share")
 colorbar.ax.tick_params(labelsize=5.5, length=1.5)
-colorbar.set_ticks(np.arange(np.ceil(trust_range[0] * 20) / 20, trust_range[1] + 1e-9, 0.05))
-colorbar.ax.yaxis.set_major_formatter("{x:.2f}")
+colorbar.set_ticks([0, 0.5, 1])
+colorbar.ax.yaxis.set_major_formatter("{x:.1f}")
 fig.savefig(out_path)
 fig.savefig(out_path.removesuffix(".pdf") + ".png", dpi=300)
