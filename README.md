@@ -82,7 +82,7 @@ tests/          tests that pin the filters, the reference rates, and the control
 | Figure 2 | `figures/case_figure.py` |
 | Confirmatory tests on MAHNOB-HCI | `evaluation/confirmatory_test.py`, `mahnob_test_scores.sh` |
 | Agreement across trials (Supplementary) | `evaluation/rate_agreement.py`, `stage_slopes.py`, `observation_track_slope.py`, `figures/rate_agreement_figure.py` |
-| Error under motion | `evaluation/head_motion.py`, `motion_tertiles.py`, `motion_perturbation.sh` |
+| Error under motion | `evaluation/head_motion.py`, `motion_tertiles.py`, `torso_displacement_rms.py`, `motion_perturbation.sh` |
 | Supplementary tables | `evaluation/cohface_scores.sh`, `supplementary_tables.py`, `parameter_table.py` |
 
 ## Running
