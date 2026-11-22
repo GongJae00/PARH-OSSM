@@ -17,7 +17,7 @@ authors:
     affiliation: "Changwon National University"
 repository-code: "https://github.com/GongJae00/PARH-OSSM"
 license: GPL-3.0-only
-version: "1.0.0"
+version: "1.1.0"
 abstract: "Code of the article: the nine video-motion observations of the chest and upper torso, the PARH-OSSM multichannel oscillator state-space filter, its comparison methods, and the scripts that produce every reported table and figure on COHFACE and MAHNOB-HCI."
 keywords:
   - contactless respiration

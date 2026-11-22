@@ -10,7 +10,7 @@
   ],
   "access_right": "open",
   "license": "gpl-3.0-only",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "keywords": ["contactless respiration", "respiratory rate", "video motion", "state-space model", "Kalman filter"],
   "related_identifiers": [
     {"identifier": "https://github.com/GongJae00/PARH-OSSM", "relation": "isSupplementTo", "scheme": "url"},
