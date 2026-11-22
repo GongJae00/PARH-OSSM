@@ -39,7 +39,7 @@ plt.rcParams.update({"font.family": "Liberation Sans", "mathtext.fontset": "cust
 source_png, observation_pkl, final_pkl, rates_csv, out_pdf = sys.argv[1:6]
 WIDTH, HEIGHT = 175.9, 84.0
 SPAN_S, BAND_HZ = (5.0, 50.0), (0.08, 0.5)
-FRAME, BLOCK = "#c8c8c8", "#6b6b6b"
+FRAME, BLOCK = "#c8c8c8", "#4a4a4a"
 # observation family of the run -> (name in the pickle of observations, label, region colour)
 FAMILIES = {"of_farneback": ("of_farneback", "OF", CHEST),
             "profile1d_quadratic": ("profile1D quadratic", "P1D", CHEST),
@@ -115,8 +115,8 @@ def image(array, x0, y0, width):
 
 
 def block_arrow(x0, y0, x1, y1):
-    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="simple,head_width=2.8,head_length=1.8,tail_width=1.0",
-                                 fc=BLOCK, ec="none", mutation_scale=1.6))
+    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="simple,head_width=3.4,head_length=2.2,tail_width=1.3",
+                                 fc=BLOCK, ec="none", mutation_scale=1.6, zorder=4))
 
 
 def arrow(x0, y0, x1, y1):
@@ -165,7 +165,7 @@ for (x, y), label_y, label, colour in [(on_photo(80, TORSO_BOX[3]), photo_bottom
 block_arrow(53.7, 20, 57.1, 20)
 
 # c: the nine observations of the extraction, grouped by image measurement; the three of the bank are framed in ink
-# and numbered as in panel d, the other six are drawn in grey. Each tile is the operator image of the submitted
+# and numbered as in panel d, the other six have a light frame. Each tile is the operator image of the submitted
 # figure (TILES, pixel boxes in the nine-observation PNG), and each trace is that observation in this trial.
 panel(57.3, 0.3, WIDTH - 0.3, 41.0, "c", "Video-derived observations")
 ROUTES = [("Optical flow", CHEST, [("of_farneback", "OF", "of_farneback"),
@@ -191,18 +191,17 @@ for route, colour, members in ROUTES:
     for name, label, family in members:
         in_bank = family is not None
         middle = x + slot / 2
-        ax.text(middle, 8.6, label, fontsize=5.5, ha="center", va="center", linespacing=0.95,
-                color=INK if in_bank else NEUTRAL)
+        ax.text(middle, 8.6, label, fontsize=5.5, ha="center", va="center", linespacing=0.95, color=INK,
+                fontweight="bold" if in_bank else "normal")
         x0, y0, x1, y1 = TILES[name]
         tile = figure[y0 + INSET:y1 - INSET, x0 + INSET:x1 - INSET]
-        height = image(tile if in_bank else (255 - 0.45 * (255 - tile.astype(float))).astype(np.uint8),
-                       x, 11.4, slot)
+        height = image(tile, x, 11.4, slot)
         ax.add_patch(Rectangle((x, 11.4), slot, height, fc="none", ec=INK if in_bank else FRAME,
-                               lw=0.8 if in_bank else 0.4, zorder=2))
+                               lw=1.0 if in_bank else 0.4, zorder=2))
         z = median_z(band_passed(signals[name]))
         trace = axes_at(x, 11.4 + height + 0.6, x + slot, 11.4 + height + 7.2)
         guide(trace)
-        draw_trace(trace, *shown(z), OBS if in_bank else NEUTRAL, lw=0.45)
+        draw_trace(trace, *shown(z), OBS, lw=0.5 if in_bank else 0.35)
         if in_bank:
             k = families.index(family)
             ax.text(middle, 30.6, f"$o_{k + 1}(t)$", fontsize=6.5, ha="center", va="center")
@@ -213,14 +212,15 @@ for route, colour, members in ROUTES:
     route_end = x - route_gap
     # the bracket carries the region's colour only when one of its observations is in the bank; names stay in ink
     active = any(family is not None for _, _, family in members)
-    ax.plot([route_start, route_start, route_end, route_end], [33.3, 34.2, 34.2, 33.3],
-            color=colour if active else NEUTRAL, lw=0.6)
-    ax.text((route_start + route_end) / 2, 36.4, route, fontsize=5.5, ha="center", va="center",
-            color=INK if active else NEUTRAL)
-# time scale of the traces, in the title row so that it is not read as the label of one tile
-scale_end = right - 4.2
-ax.plot([scale_end - (scale[1] - scale[0]), scale_end], [3.2, 3.2], color=INK, lw=0.6, solid_capstyle="butt")
-ax.text(scale_end + 0.6, 3.2, "10 s", fontsize=5, va="center")
+    ax.plot([route_start, route_start, route_end, route_end], [33.3, 34.2, 34.2, 33.3], color=colour, lw=0.6)
+    ax.text((route_start + route_end) / 2, 36.4, route, fontsize=5.5, ha="center", va="center", color=INK)
+# time scale of the traces: a 10-s double arrow under the OF bridge trace, which carries no o_k label
+ax.add_patch(FancyArrowPatch((scale[0], 30.6), (scale[1], 30.6), arrowstyle="<|-|>,head_width=0.7,head_length=1.0",
+                             mutation_scale=1, lw=0.45, color=INK, shrinkA=0, shrinkB=0))
+ax.text(scale[1] + 0.8, 30.6, "10 s", fontsize=5, va="center")
+# what the frame means, in the title row of the panel
+ax.add_patch(Rectangle((right - 33.0, 2.1), 3.2, 2.2, fc="none", ec=INK, lw=1.0))
+ax.text(right - 29.0, 3.2, "used by the filter, $o_1$–$o_3$", fontsize=5.5, va="center")
 block_arrow(64.0, 41.2, 64.0, 44.6)
 
 # d: observation law; each row of the observation vector, its noise variance, its trust, and its update share

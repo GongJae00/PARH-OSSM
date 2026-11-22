@@ -77,7 +77,7 @@ tests/          tests that pin the filters, the references, the bank, the contro
 | Agreement across trials | `evaluation/across_trials/` |
 | Error under motion | `evaluation/motion/`, `evaluation/motion_perturbation.sh` |
 | Supplementary tables | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
-| Figures | `figures/architecture_figure.py`, `case_figure.py`, `rate_agreement_figure.py` |
+| Figures | `figures/architecture_figure.py`, `case_figure.py`, `agreement_figure.py`, `rate_agreement_figure.py` |
 
 A run is a folder of per-trial pickles written by `estimate/materialize.sh <run>`:
 
@@ -148,7 +148,8 @@ evaluation/mahnob_test_scores.sh <records> <tables> <mahnob>/data <mahnob bank>/
     <mahnob runs>/frozen/final/data <MAHNOB-HCI> 8
 ```
 
-Figure 2 comes from `figures/case_figure.py`. Figure 1 of the article, `figures/architecture_figure.py`,
+Figure 2 comes from `figures/case_figure.py` and Figure 3 from `figures/agreement_figure.py`, which reads the
+trial-mean CSVs that `evaluation/across_trials/rate_agreement.py` writes. Figure 1 of the article, `figures/architecture_figure.py`,
 draws the regions on a photograph of an author, which is not distributed.
 
 Another set of videos needs a class in `observations/datasets.py` that lists its videos and loads its belt;

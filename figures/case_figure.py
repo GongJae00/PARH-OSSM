@@ -42,7 +42,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from evaluation.reference.belt_reference import filter_RW, recorded_belt
 from bank import BANK
-from figure_style import CHEST, INK, MM, NEUTRAL, OBS, OSSM, PARH, TORSO, draw_share, draw_trace, lighter, median_z
+from figure_style import CHEST, INK, MM, NEUTRAL, OBS, OSSM, PARH, TORSO, draw_share, draw_trace, median_z, tint
 
 matplotlib.use("pdf")
 WIN, MIN_WINDOWS, MIN_HZ, MAX_HZ = 30, 10, 0.08, 0.5
@@ -51,7 +51,6 @@ OBSERVATION_START_SEC = 2.0
 OBSERVATIONS = [(label, label.lower().replace(" ", "_"), name, TORSO if label == "torso_shift" else CHEST)
                 for label, name in BANK.items()]
 WINDOW_S = 60.0
-LINE_MM = 2.3  # minimum spacing of direct labels, in mm
 
 
 def median_case(windows, development):
@@ -84,20 +83,20 @@ for name, csv_path, final_dir, observation_dir in [("COHFACE", cohface_csv, cohf
     print(f"{name}: {trial}, PARH-OSSM Hilbert MAE {trial_mae:.3f} bpm, median over {n_trials} trials {median_mae:.3f}")
 
 rate_columns = ["hilbert_reference_bpm", "parh_track_bpm", "ossm_kf_track_bpm"]
-rate_limits = [(min(c["windows"][rate_columns].min().min(), c["constant"]),
-                max(c["windows"][rate_columns].max().max(), c["constant"])) for c in cases]
-rate_span = np.ceil(max(high - low for low, high in rate_limits)) + 1
 
-# layout in mm; the figure keeps the text width of the article
+# layout in mm, at the text width of the article: one row per trial, one column per stage, as in the order in which
+# the method uses them (observations, their update shares, the output waveform, the window rates)
 WIDTH = 175.9
-COLUMNS = [(27.0, 88.0), (101.0, 161.0)]
-TEXT_LINE = 3.8
-ROW1_Y, ROW1_LANE = 8.0, 7.5
-ROW2_Y, SHARE_H, SHARE_GAP = ROW1_Y + 4 * ROW1_LANE + TEXT_LINE, 3.4, 0.8
-ROW3_Y, ROW3_H = ROW2_Y + 3 * SHARE_H + 2 * SHARE_GAP + TEXT_LINE, 16.0
-ROW4_Y, ROW4_H = ROW3_Y + ROW3_H + 6.8 + TEXT_LINE, 26.0  # tick labels and "Time (s)", then one text line
-HEIGHT = ROW4_Y + ROW4_H + 8.5
+LABEL_X = 11.0
+COLUMNS = {"observations": (12.0, 56.0), "share": (66.0, 94.0), "waveform": (100.0, 138.0), "rate": (149.0, 174.5)}
+TITLES = {"observations": "Belt and observations", "share": "Update share, 0 to 1", "waveform": "Waveform",
+          "rate": "Rate (bpm)"}
+PANEL_H, HEADER, TICKS, ROW_GAP = 34.0, 4.6, 7.4, 3.2
+ROW_Y = [6.0 + HEADER, 6.0 + HEADER + PANEL_H + TICKS + ROW_GAP + HEADER]
+HEIGHT = ROW_Y[1] + PANEL_H + TICKS + 6.0
 LANE_UNITS, GAIN = 1.6, 0.26
+SHARE_H, SHARE_GAP = 9.6, 2.6
+SHORT = {"OF": "OF", "P1D": "P1D", "Torso displacement": "Torso"}
 
 fig = plt.figure(figsize=(WIDTH * MM, HEIGHT * MM))
 canvas = fig.add_axes((0, 0, 1, 1))
@@ -116,53 +115,35 @@ def axes_mm(x0, y0, x1, y1, xlim):
     return ax
 
 
-def to_mm(ax, x, y):
-    """Position of a data point on the canvas, in mm from the top left."""
-    px, py = ax.transData.transform((x, y))
-    return px / fig.dpi * 25.4, HEIGHT - py / fig.dpi * 25.4
+def time_axis(ax, span, step, label):
+    ax.spines["bottom"].set_visible(True)
+    ax.spines["bottom"].set_linewidth(0.4)
+    ax.set_xticks(np.arange(np.ceil(span[0] / step) * step, span[1] + 1e-6, step))
+    ax.tick_params(axis="x", length=1.5, pad=1, labelsize=5)
+    if label:
+        ax.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
 
 
-def spread(ys, gap=LINE_MM):
-    """Move label positions apart to at least gap, keeping their order and their mean."""
-    order = np.argsort(ys)
-    y = np.asarray(ys, float)[order]
-    for _ in range(50):
-        for k in range(1, len(y)):
-            if y[k] - y[k - 1] < gap:
-                shift = (gap - (y[k] - y[k - 1])) / 2
-                y[k - 1] -= shift
-                y[k] += shift
-    out = np.empty_like(y)
-    out[order] = y
-    return out
-
-
-def end_labels(items, x_mm=None):
-    """Direct labels beside the ends of lines: items are (ax, x, y, text, colour); labels that would overlap are spread."""
-    anchors = [to_mm(ax, x, y) for ax, x, y, _, _ in items]
-    ys = spread([a[1] for a in anchors])
-    for (ax, x, y, text, colour), (ax_mm, _), label_y in zip(items, anchors, ys):
-        line_key(ax_mm + 0.9 if x_mm is None else x_mm, label_y, text, colour)
-
-
-def line_key(x_mm, y_mm, text, colour):
+def line_key(x_mm, y_mm, text, colour, dotted=False):
     """A name in ink after a short stroke of its line's colour, so that colour is never the only cue."""
-    canvas.plot([x_mm, x_mm + 1.3], [y_mm, y_mm], color=colour, lw=0.9, solid_capstyle="butt")
-    canvas.text(x_mm + 1.8, y_mm, text, fontsize=5, color=INK, va="center")
+    canvas.plot([x_mm, x_mm + 2.6], [y_mm, y_mm], color=colour, lw=0.9, solid_capstyle="butt",
+                ls=(0, (1, 1.2)) if dotted else "-")
+    canvas.text(x_mm + 3.3, y_mm, text, fontsize=5.5, color=INK, va="center")
+    return x_mm + 3.3 + 0.93 * len(text) + 4.5
 
 
-def row_title(y, text):
-    canvas.text(0.5, y, text, fontsize=6, va="center")
+def area_key(x_mm, y_mm, text, colour):
+    canvas.add_patch(plt.Rectangle((x_mm, y_mm - 0.9), 2.6, 1.8, color=tint(colour), lw=0))
+    canvas.text(x_mm + 3.3, y_mm, text, fontsize=5.5, color=INK, va="center")
+    return x_mm + 3.3 + 0.93 * len(text) + 4.5
 
 
-row_title(ROW1_Y + 3.2, "Belt and\nobservations")
-row_title(ROW2_Y + 1.7, "Update share")
-row_title(ROW3_Y + 2.0, "Waveform")
-row_title(ROW4_Y + 2.0, "Rate (bpm)")
-compressed_named = False
+for key, (x0, x1) in COLUMNS.items():
+    canvas.text((x0 + x1) / 2, 3.2, TITLES[key], fontsize=6, fontweight="bold", ha="center", va="center")
 
-for column, case in enumerate(cases):
-    x0, x1 = COLUMNS[column]
+for row, case in enumerate(cases):
+    top = ROW_Y[row]
+    bottom_row = row == len(cases) - 1
     estimate = case["final"]["estimates"][0]["estimate"]
     fps, fs_gt = float(case["final"]["fps"]), float(case["final"]["fs_gt"])
     belt = filter_RW(recorded_belt(case["final"]["gt"]), fs_gt, lo=MIN_HZ, hi=MAX_HZ).reshape(-1)
@@ -171,7 +152,7 @@ for column, case in enumerate(cases):
     belt_time = np.arange(belt.size) / fs_gt
     shown = belt_time <= video_time[-1]
     trial_span = (0.0, float(video_time[-1]))
-    if column == 1:
+    if case["name"] == "MAHNOB-HCI":
         windows = case["windows"]
         centre_of_maximum = float(windows.loc[windows.hilbert_reference_bpm.idxmax(), "window"] + WIN / 2)
         start = min(max(centre_of_maximum - WINDOW_S / 2, 0.0), trial_span[1] - WINDOW_S)
@@ -184,99 +165,80 @@ for column, case in enumerate(cases):
     identifier = case["trial"].split("_")[1:]
     name = (f"{case['name']}, subject {identifier[0]}, trial {identifier[1]}" if case["name"] == "COHFACE"
             else f"{case['name']}, session {identifier[0]}")
-    letter_x = 0.5 if column == 0 else x0 - 8.0
-    canvas.text(letter_x, 4.2, "ab"[column], fontsize=8, fontweight="bold", va="baseline")
-    canvas.text(letter_x + 4.0, 4.2, name, fontsize=6.5, fontweight="bold", va="baseline")
+    canvas.text(0.6, top - HEADER + 1.6, "ab"[row], fontsize=8, fontweight="bold", va="center")
+    canvas.text(4.4, top - HEADER + 1.6, f"{name}; trial MAE {case['mae']:.2f} bpm", fontsize=6, va="center")
 
-    # row 1: the belt and the three observations
-    traces = axes_mm(x0, ROW1_Y, x1, ROW1_Y + 4 * ROW1_LANE, span)
-    traces.set_ylim(-3 * LANE_UNITS - LANE_UNITS / 2, LANE_UNITS / 2)
+    # observations: the belt and the three observations of the bank, one lane each
+    x0, x1 = COLUMNS["observations"]
+    traces = axes_mm(x0, top, x1, top + PANEL_H, span)
+    traces.set_ylim(-3 * LANE_UNITS - LANE_UNITS / 2 - 0.25, LANE_UNITS / 2)
     z_belt = median_z(belt[shown])
     draw_trace(traces, belt_time[shown], z_belt, INK, gain=GAIN, lw=0.5)
+    canvas.text(LABEL_X, top + PANEL_H * 0.5 / 4.15, "Belt", fontsize=5.5, ha="right", va="center")
     first = int(OBSERVATION_START_SEC * fps)
-    for row, (method, _, label, _) in enumerate(OBSERVATIONS, start=1):
+    for lane, (method, _, label, _) in enumerate(OBSERVATIONS, start=1):
         observation = case["observations"][method][first:n_video]
         observation = filter_RW(observation, fps, lo=MIN_HZ, hi=MAX_HZ).reshape(-1) if observation.std() > 0 else observation
         time = video_time[first:first + observation.size]
-        z = median_z(observation)
-        beyond = draw_trace(traces, time, z, OBS, offset=-row * LANE_UNITS, gain=GAIN, lw=0.45)
-        inside = (time >= span[0]) & (time <= span[1])
-        if not compressed_named and (beyond & inside).any():
-            # named beside the light segments: right of the last compressed stretch of the first cluster
-            # (stretches less than 5 s apart), at the top of the row
-            visible = np.flatnonzero(beyond & inside)
-            gaps = np.flatnonzero(np.diff(time[visible]) > 5.0)
-            last = visible[gaps[0]] if gaps.size else visible[-1]
-            traces.text(time[last] + 0.015 * (span[1] - span[0]), -row * LANE_UNITS + LANE_UNITS / 2 - 0.05,
-                        "compressed", fontsize=5, color=lighter(OBS, 0.3), va="top")
-            compressed_named = True
-        if column == 0:
-            canvas.text(x0 - 1.5, ROW1_Y + (row + 0.5) * ROW1_LANE, label, fontsize=5.5, ha="right", va="center")
-    if column == 0:
-        canvas.text(x0 - 1.5, ROW1_Y + 0.5 * ROW1_LANE, "Belt", fontsize=5.5, ha="right", va="center", color=INK)
+        draw_trace(traces, time, median_z(observation), OBS, offset=-lane * LANE_UNITS, gain=GAIN, lw=0.45)
+        canvas.text(LABEL_X, top + PANEL_H * (lane + 0.5) / 4.15, SHORT.get(label, label), fontsize=5.5,
+                    ha="right", va="center")
+    time_axis(traces, span, 10 if span[1] - span[0] <= 70 else 20, bottom_row)
 
-    # row 2: the update share of each observation
+    # update share of each observation in the Kalman update
+    x0, x1 = COLUMNS["share"]
     precision = 1.0 / np.asarray(estimate["diagnostics"]["R_eff_t_channels"], dtype=float)
     update_share = precision / precision.sum(axis=0)
     families = json.loads(estimate["meta"])["observation_families"]
     share_time = np.linspace(0, video_time[-1], update_share.shape[1])
-    for row, (_, family, label, colour) in enumerate(OBSERVATIONS):
-        y = ROW2_Y + row * (SHARE_H + SHARE_GAP)
+    for lane, (_, family, label, colour) in enumerate(OBSERVATIONS):
+        y = top + 1.0 + lane * (SHARE_H + SHARE_GAP)
         share_axes = axes_mm(x0, y, x1, y + SHARE_H, span)
         draw_share(share_axes, share_time, update_share[families.index(family)], colour)
-        if column == 0:
-            canvas.text(x0 - 1.5, y + SHARE_H / 2, label, fontsize=5.5, ha="right", va="center")
-        if column == 1 and row == 0:
-            canvas.plot([x1 + 1.4] * 2, [y, y + SHARE_H], color=INK, lw=0.4)
-            canvas.text(x1 + 2.2, y, "1", fontsize=4.5, va="center")
-            canvas.text(x1 + 2.2, y + SHARE_H, "0", fontsize=4.5, va="center")
+        canvas.text(x0 - 1.2, y + SHARE_H / 2, SHORT.get(label, label), fontsize=5.5, ha="right", va="center")
+        if lane == len(OBSERVATIONS) - 1:
+            time_axis(share_axes, span, 20, bottom_row)
 
-    # row 3: the waveforms
-    waveform = axes_mm(x0, ROW3_Y, x1, ROW3_Y + ROW3_H, span)
-    waveform.set_ylim(-3.3, 3.3)
+    # output waveform against the belt, both scaled the same way, without lag or sign correction
+    x0, x1 = COLUMNS["waveform"]
+    waveform = axes_mm(x0, top, x1, top + PANEL_H, span)
+    waveform.set_ylim(-3.4, 3.4)
     z_smoothed = median_z(np.asarray(estimate["z_full_smoothed"], dtype=float))
-    draw_trace(waveform, belt_time[shown], z_belt, INK, lw=0.6)
-    draw_trace(waveform, video_time[:z_smoothed.size], z_smoothed, PARH, lw=0.6)
-    waveform.spines["bottom"].set_visible(True)
-    waveform.set_xticks(np.arange(np.ceil(span[0] / 10) * 10, span[1] + 1e-6, 10))
-    waveform.tick_params(length=1.5, pad=1, labelsize=5)
-    waveform.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
-    if column == 0:
-        # a's traces run to the gutter, so its two names sit above the right end of the axis
-        line_key(x1 - 12.6, ROW3_Y - 1.2, "PARH-OSSM", PARH)
-        line_key(x1 - 19.6, ROW3_Y - 1.2, "Belt", INK)
-    else:
-        ends = []
-        for label_text, time, z, colour in (("Belt", belt_time[shown], z_belt, INK),
-                                            ("PARH-OSSM", video_time[:z_smoothed.size], z_smoothed, PARH)):
-            k = np.flatnonzero(time <= span[1])[-1]
-            ends.append((waveform, span[1], float(np.clip(3 * np.tanh(z[k] / 3), -3.3, 3.3)), label_text, colour))
-        end_labels(ends, x_mm=x1 + 0.9)
+    draw_trace(waveform, belt_time[shown], z_belt, INK, lw=0.55)
+    draw_trace(waveform, video_time[:z_smoothed.size], z_smoothed, PARH, lw=0.55)
+    time_axis(waveform, span, 10 if span[1] - span[0] <= 70 else 20, bottom_row)
 
-    # row 4: the window rates over the whole trial
-    rate = axes_mm(x0, ROW4_Y, x1, ROW4_Y + ROW4_H, trial_span)
-    middle = sum(rate_limits[column]) / 2
-    rate.set_ylim(middle - rate_span / 2, middle + rate_span / 2)
+    # window rates over the whole trial; the span of the other panels is shaded where it is shorter than the trial
+    x0, x1 = COLUMNS["rate"]
+    rate = axes_mm(x0, top, x1, top + PANEL_H, trial_span)
     centre = case["windows"].window + WIN / 2
-    if column == 1:
-        rate.axvspan(*span, color="#e9e9e9", lw=0, zorder=0)
-        canvas.text(to_mm(rate, span[0], 0)[0] + 0.3, ROW4_Y - 0.5, "Window shown above", fontsize=4.8,
-                    color="#6f6f6f", va="bottom")
-    rate.plot([centre.min(), centre.max()], [case["constant"]] * 2, color=NEUTRAL, lw=0.8, ls=(0, (1, 1.5)), zorder=1)
-    for key, colour in (("hilbert_reference_bpm", INK), ("parh_track_bpm", PARH), ("ossm_kf_track_bpm", OSSM)):
-        rate.plot(centre, case["windows"][key], color=colour, lw=1.0, zorder=2)
-    for side in ("left", "bottom"):
-        rate.spines[side].set_visible(True)
-    rate.yaxis.set_major_locator(MultipleLocator(2))
-    rate.set_xticks(np.arange(0, trial_span[1] + 1e-6, 10 if column == 0 else 20))
-    rate.tick_params(length=1.5, pad=1, labelsize=5)
-    rate.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
-    last = case["windows"].iloc[-1]
-    labels = [(rate, centre.iloc[-1], last[key], text, colour) for key, text, colour in (
-        ("hilbert_reference_bpm", "Hilbert reference", INK), ("parh_track_bpm", "PARH-OSSM", PARH),
-        ("ossm_kf_track_bpm", "OSSM-KF", OSSM))]
-    labels.append((rate, centre.iloc[-1], case["constant"], "Constant predictor", "#6f6f6f"))
-    end_labels(labels)
+    values = case["windows"][rate_columns]
+    low = np.floor(min(values.min().min(), case["constant"])) - 1
+    high = np.ceil(max(values.max().max(), case["constant"])) + 1
+    rate.set_ylim(low, high)
+    if span != trial_span:
+        rate.axvspan(*span, color="#ececec", lw=0, zorder=0)
+        rate.text((span[0] + span[1]) / 2, high - 0.03 * (high - low), "shown at left", fontsize=4.8, color="#6f6f6f",
+                  ha="center", va="top")
+    rate.plot([centre.min(), centre.max()], [case["constant"]] * 2, color=NEUTRAL, lw=0.8, ls=(0, (1, 1.2)), zorder=1)
+    for key, colour in (("hilbert_reference_bpm", INK), ("ossm_kf_track_bpm", OSSM), ("parh_track_bpm", PARH)):
+        rate.plot(centre, case["windows"][key], color=colour, lw=0.9, zorder=2)
+    rate.spines["left"].set_visible(True)
+    rate.spines["left"].set_linewidth(0.4)
+    rate.yaxis.set_major_locator(MultipleLocator(2 if high - low <= 10 else 4))
+    rate.tick_params(axis="y", length=1.5, pad=1, labelsize=5)
+    time_axis(rate, trial_span, 20 if trial_span[1] <= 70 else 40, bottom_row)
+
+# one key for both rows
+y_key = HEIGHT - 2.6
+x = 12.0
+x = line_key(x, y_key, "Belt; Hilbert reference rate", INK)
+x = line_key(x, y_key, "Observation", OBS)
+x = line_key(x, y_key, "PARH-OSSM", PARH)
+x = line_key(x, y_key, "OSSM-KF", OSSM)
+x = line_key(x, y_key, "Constant predictor", NEUTRAL, dotted=True)
+x = area_key(x, y_key, "Chest ROI", CHEST)
+x = area_key(x, y_key, "Torso box", TORSO)
 
 fig.savefig(out_path)
 fig.savefig(out_path.removesuffix(".pdf") + ".png", dpi=300)
