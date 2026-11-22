@@ -155,10 +155,13 @@ EXCLUSION_DATASETS = [("cohface_frozen_window_rates_three_references.csv", "none
 
 
 def gains_against(variants, datasets):
-    """Per dataset, the frozen method against each variant: the subject-level gains of compare()."""
+    """Per dataset, the frozen method against each variant: the subject-level gains of compare(). A variant reads the
+    PARH-OSSM track of its run, except the equal-weight control, which reads the bank's OSSM-KF tracks averaged."""
     gains = []
     for frozen, split_csv, evaluated, variant in datasets:
-        comparators = [f"{v}={os.path.join(records_dir, variant.format(v))}:parh_track_bpm" for v, _ in variants]
+        equal_weight = frozen.split("_frozen")[0] + "_equal_weight_track_rates.csv:equal_weight_track_bpm"
+        comparators = [f"{v}={os.path.join(records_dir, equal_weight if v == 'equal_weight' else variant.format(v) + ':parh_track_bpm')}"
+                       for v, _ in variants]
         split_path = split_csv if split_csv == "none" else os.path.join(records_dir, split_csv)
         gains.append(compare(os.path.join(records_dir, frozen), split_path, evaluated, comparators)[3].set_index(["comparator", "reference"]))
     return gains
@@ -177,10 +180,11 @@ def write_gain_rows(path, variants, gains):
 write_gain_rows("S_exclusion.tex", EXCLUSIONS, gains_against(EXCLUSIONS, EXCLUSION_DATASETS))
 
 # Reliability controls: the trust of each observation in the filter replaced by its mean over the observations
-# at the same frame (equal_filter_trust.py), and the readout's reliability priors made equal across families or shuffled
-# in time within each trial (reliability_controls.py)
+# at the same frame (equal_filter_trust.py), the readout's reliability priors made equal across families or shuffled
+# in time within each trial (reliability_controls.py), and the bank's OSSM-KF tracks averaged without weights in place
+# of PARH-OSSM (equal_weight_track_rates.py)
 CONTROLS = [("equal_filter", "Filter trust equal across observations"), ("equal_readout", "Readout priors equal across families"),
-            ("shuffled_readout", "Readout priors shuffled in time")]
+            ("shuffled_readout", "Readout priors shuffled in time"), ("equal_weight", "Observation tracks averaged without weights")]
 CONTROL_DATASETS = [("cohface_frozen_window_rates_three_references.csv", "none", "all",
                      "cohface_{}_window_rates_three_references.csv"),
                     ("mahnob_frozen_onset_window_rates_three_references.csv", "mahnob_subject_split.csv", MAHNOB_EVALUATED,

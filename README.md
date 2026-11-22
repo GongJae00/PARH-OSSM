@@ -76,7 +76,9 @@ slow baseline, and an aperiodic residual. (d) The rate track and the smoothed wa
    quality, and the rate posterior, which completes PARH-OSSM. Three controls each remove one use of reliability
    and keep everything else: `equal_filter` replaces the trust of each observation by its mean over the
    observations at the same frame, `equal_readout` gives every family the mean of the family priors in each
-   window, and `shuffled_readout` permutes the windows of each family's priors within the trial. Each route
+   window, and `shuffled_readout` permutes the windows of each family's priors within the trial. A fourth control
+   averages the observations' OSSM-KF tracks without weights, in place of the filter and the readout
+   (`evaluation/bank_rates.sh`). Each route
    exclusion reruns PARH-OSSM without one observation of the bank, its route, and keeps the priors of the whole
    bank.
 
