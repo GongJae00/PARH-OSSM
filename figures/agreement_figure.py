@@ -41,7 +41,7 @@ mahnob = pd.read_csv(mahnob_csv)
 cohface = cohface[cohface.reference == REFERENCE]
 mahnob = mahnob[(mahnob.reference == REFERENCE) & mahnob.trial.isin(test)].copy()
 
-WIDTH, HEIGHT = 175.9, 64.0
+WIDTH, HEIGHT = 175.9, 53.0
 fig = plt.figure(figsize=(WIDTH * MM, HEIGHT * MM))
 
 
@@ -54,13 +54,13 @@ def letter(x_mm, y_mm, text, title):
     fig.text((x_mm + 4.0) / WIDTH, 1 - y_mm / HEIGHT, title, fontsize=6.5, va="baseline")
 
 
-TOP, BOTTOM = 8.0, 54.0
+TOP, BOTTOM = 7.0, 43.0
 # one square range for both panels, so that the slopes can be compared by eye
 shown_all = pd.concat([t[t.method.isin([m for m, _, _ in SCATTER])] for t in (cohface, mahnob)])
 low = np.floor(shown_all[["estimate_bpm", "reference_bpm"]].min().min()) - 0.5
 high = np.ceil(shown_all[["estimate_bpm", "reference_bpm"]].max().max()) + 0.5
 span = high - low
-for panel, (trials, title, x0) in enumerate([(cohface, "COHFACE", 13.0), (mahnob, "MAHNOB-HCI test", 72.0)]):
+for panel, (trials, title, x0) in enumerate([(cohface, "COHFACE", 13.0), (mahnob, "MAHNOB-HCI", 72.0)]):
     ax = axes_mm(x0, TOP, x0 + (BOTTOM - TOP), BOTTOM)
     cohort = trials[trials.method == "constant"].estimate_bpm.iloc[0]
     ax.plot([low, high], [low, high], color=GUIDE, lw=0.6, ls=(0, (3, 2)), zorder=1)
@@ -108,7 +108,7 @@ ax.set_xticks(range(3))
 ax.set_xticklabels([f"{t.capitalize()}\n{edges[k]:.1f}–{edges[k + 1]:.1f}" for k, t in enumerate(TERCILES)])
 ax.tick_params(length=1.5, pad=1, labelsize=5)
 ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(2))
-ax.set_ylabel("Bias, estimate minus reference (bpm)", fontsize=5.5, labelpad=1)
+ax.set_ylabel("Bias (bpm)", fontsize=5.5, labelpad=1)
 ax.set_xlabel("Tercile of the reference rate (bpm)", fontsize=5.5, labelpad=1)
 lo, hi = ax.get_ylim()
 ax.set_ylim(lo, hi)
@@ -129,7 +129,7 @@ placed[order] = y
 for (value, name, colour), label_y in zip(ends, placed):
     ax.annotate(name, xy=(2, value), xytext=(2.45, label_y), fontsize=5.2, color=INK, va="center",
                 annotation_clip=False, arrowprops=dict(arrowstyle="-", color=colour, lw=0.5, shrinkA=0, shrinkB=1.5))
-letter(x0 - 11.0, 4.6, "c", "MAHNOB-HCI test")
+letter(x0 - 11.0, 4.6, "c", "MAHNOB-HCI")
 for side in ("top", "right"):
     for a in fig.axes:
         a.spines[side].set_visible(False)

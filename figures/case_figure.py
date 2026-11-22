@@ -90,13 +90,14 @@ rate_columns = ["hilbert_reference_bpm", "parh_track_bpm", "ossm_kf_track_bpm"]
 WIDTH = 175.9
 LABEL_X = 11.0
 COLUMNS = {"observations": (12.0, 56.0), "share": (66.0, 94.0), "waveform": (100.0, 138.0), "rate": (149.0, 174.5)}
-TITLES = {"observations": "Belt and observations", "share": "Update share, 0 to 1", "waveform": "Waveform",
+TITLES = {"observations": "Belt and observations", "share": "Update share", "waveform": "Waveform",
           "rate": "Rate (bpm)"}
-PANEL_H, HEADER, TICKS, ROW_GAP = 34.0, 4.6, 7.4, 3.2
+PANEL_H, HEADER, TICKS, ROW_GAP = 26.0, 4.6, 7.4, 2.4
 ROW_Y = [6.0 + HEADER, 6.0 + HEADER + PANEL_H + TICKS + ROW_GAP + HEADER]
 HEIGHT = ROW_Y[1] + PANEL_H + TICKS + 2.0
 LANE_UNITS, GAIN = 1.6, 0.26
-SHARE_H, SHARE_GAP = 9.6, 2.6
+SHARE_GAP = 2.0
+SHARE_H = (PANEL_H - 1.0 - 2 * SHARE_GAP) / 3  # three lanes fill the panel height
 SHORT = {"OF": "OF", "P1D": "P1D", "Torso displacement": "Torso"}
 
 fig = plt.figure(figsize=(WIDTH * MM, HEIGHT * MM))

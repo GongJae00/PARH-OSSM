@@ -261,12 +261,11 @@ for x in (81.0, 123.0):
 ax.text(centres[1] + 0.9, (node_y + NODE + out_y - 1.8) / 2, "$H_t$", fontsize=6, ha="left", va="center")
 decomposition = estimate["decomposition"]
 fundamental_scale = 1.4826 * np.median(np.abs(np.asarray(decomposition["h1"], float)))
-ax.text(78.0, 64.6, "Smoothed components of $\\mathbf{x}_t$", fontsize=5.5, va="center")
+# the smoothed components of x_t, one row each, spaced evenly between the outputs y_t and the panel's lower edge
 for row, (key, label, gain) in enumerate(COMPONENTS):
-    y = 68.6 + row * 3.8
+    y = 67.0 + row * 4.4
     ax.text(78.0, y, label, fontsize=5.5, va="center")
     component = axes_at(96.5, y - 1.8, 127.6, y + 1.8, ylim=(-2.2, 2.2))
-    guide(component)
     time, values = shown(gain * np.asarray(decomposition[key], float) / fundamental_scale)
     component.plot(time, values, color=PARH if key == "h1" else INK, lw=0.5)
 block_arrow(129.2, 63.2, 132.4, 63.2)
