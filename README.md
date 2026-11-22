@@ -11,8 +11,9 @@ Young-Jae Cho<sup>1,†</sup>, Do-Yup Kim<sup>2,†</sup>, Dae-Yeol Kim<sup>1,&#
 
 Breathing moves the upper torso by about a pixel in an ordinary video, mixed with head motion, drift, and
 changes of light. The code reads that movement through three video observations and estimates one latent
-breathing oscillation from all of them with a multichannel oscillator state-space filter, PARH-OSSM, which
-weights each observation by a reliability computed from the video alone. It returns a respiratory rate and a
+breathing oscillation from all of them with PARH-OSSM, the Physiology-Aligned Regime-Adaptive Harmonic
+Oscillatory State-Space Model, a multichannel filter that weights each observation by a reliability computed
+from the video alone. It returns a respiratory rate and a
 waveform; no step reads the respiratory belt, which only the evaluation uses.
 
 <br>
@@ -79,15 +80,18 @@ tests/          tests that pin the filters, the references, the bank, the contro
 | Supplementary tables | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
 | Figures | `figures/architecture_figure.py`, `case_figure.py`, `agreement_figure.py`, `rate_agreement_figure.py` |
 
-A run is a folder of per-trial pickles written by `estimate/materialize.sh <run>`:
+A run is a folder of per-trial pickles. `frozen` is this repository's name for the reported run. The first four
+rows name arguments of `estimate/materialize.sh <run>`; `with_dof`, `chest_only` and `w2` are names of output
+folders that the scoring scripts read, made as the paragraph after the commands below says:
 
 | Run | Method | In the article |
 |---|---|---|
 | `frozen` | PARH-OSSM | Tables 2 and 3 |
 | `plain_multichannel`, `readout`, `observation_law`, `observability` | stages before the rate posterior | Table 2, lower block |
 | `equal_filter`, `equal_readout`, `shuffled_readout` | reliability controls | Supplementary |
-| `no_of`, `no_p1d`, `no_torso`, `with_dof` | observations left out or added back | Supplementary |
-| `chest_only`, `w2` | the submitted method on COHFACE and MAHNOB-HCI | Table 2 |
+| `no_of`, `no_p1d`, `no_torso` | observations left out | Supplementary |
+| `with_dof` (folder) | DoF added back | Supplementary |
+| `chest_only`, `w2` (folders) | the submitted method on COHFACE and MAHNOB-HCI | Table 2 |
 
 ## Running
 
@@ -132,10 +136,12 @@ evaluation/window_rates.sh mahnob <mahnob>/data <mahnob runs> <records> 8 <MAHNO
 evaluation/bank_rates.sh mahnob <mahnob bank>/data <records> 8
 ```
 
-The other runs of the table above take the same `materialize.sh` call. `with_dof` and `chest_only` read a
-bank made by `bank_priors.sh ... with_dof` or `... chest_only`; `w2` reads the submitted extraction
-(`configs/mahnob.json`) with the priors stored in `estimate/readout/submitted_reliability_priors.csv.gz`,
-which were computed from observation files that were not kept. Head motion and the image perturbations come
+The other runs of the table above take the same `materialize.sh` call. The three folders run the `frozen`
+settings on other inputs: `with_dof` and `chest_only` on a bank made by `bank_priors.sh ... with_dof` or
+`... chest_only`, for example `estimate/materialize.sh frozen <that bank>/data <that bank>/priors_group.csv
+<runs>/with_dof 8`, and `w2` on the submitted extraction (`configs/mahnob.json`) with the priors stored in
+`estimate/readout/submitted_reliability_priors.csv.gz` in place of `priors_group.csv`, which were computed from
+observation files that were not kept. Head motion and the image perturbations come
 from `evaluation/motion/head_motion.py` and `evaluation/motion_perturbation.sh`. The scoring scripts then write
 the table rows: the first MAHNOB-HCI call scores the development participants, the second the test participants.
 
@@ -150,7 +156,8 @@ evaluation/mahnob_test_scores.sh <records> <tables> <mahnob>/data <mahnob bank>/
 
 Figure 2 comes from `figures/case_figure.py` and Figure 3 from `figures/agreement_figure.py`, which reads the
 trial-mean CSVs that `evaluation/across_trials/rate_agreement.py` writes. Figure 1 of the article, `figures/architecture_figure.py`,
-draws the regions on a photograph of an author, which is not distributed.
+draws the regions on a photograph of an author, which is not distributed. The overview at the top of this page is
+a schematic of the same pipeline, not the article's Figure 1.
 
 Another set of videos needs a class in `observations/datasets.py` that lists its videos and loads its belt;
 the reliability priors are then fitted on its own bank with `estimate/bank_priors.sh`.

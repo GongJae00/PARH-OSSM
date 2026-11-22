@@ -1,7 +1,7 @@
 """Bounded-lag waveform CCC against phase-randomized copies of each trial's own belt (the COHFACE null question).
 
 bounded_lag_waveform.py takes its null from other subjects' belts. On COHFACE that null is lower for PARH
-than for OSSM-KF (median 0.171 against 0.187), which raises PARH's excess over the null. An other-subject
+than for OSSM-KF (median 0.162 against 0.183), which raises PARH's excess over the null. An other-subject
 belt differs from the trial's belt in its rate as well as in its timing, so a waveform that keeps closer to
 one rate can score lower against it without following the breath any better. A phase-randomized copy keeps
 the belt's amplitude spectrum, and so its rate content, and randomizes only the timing: the DFT phases of

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The COHFACE analyses behind the main tables, the waveform table and the Supplementary, on all 160 trials. COHFACE
-# was used to build the method, so these are descriptive and none of them is a test. It writes the rows of Tables 2
-# and 3 (main_tables.sh), the waveform agreement of the frozen run with the phase-randomized null and the rows of
+# was used to build the method, so these are descriptive and none of them is a test. It writes the rows of Table 2
+# (main_tables.sh), the waveform agreement of the frozen run with the phase-randomized null and the rows of
 # the waveform table, the correlation of the errors of the observation pairs, the reliability controls, the
 # component ladder and the route exclusions against the frozen run, the frozen run's trial means and head-motion
 # tertiles, the slopes of the trial means by stage, and the per-trial errors on the perturbed copies of

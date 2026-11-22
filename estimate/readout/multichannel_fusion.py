@@ -294,7 +294,7 @@ def parse_args() -> argparse.Namespace:
         "--enable-rate-posterior",
         action="store_true",
         help=(
-            "Experimental: export a GT-free candidate-frequency posterior "
+            "Export a GT-free candidate-frequency posterior "
             "over observation-class hypotheses. PARH uses it as a weak h1 "
             "uncertainty/anchor signal, not as a hard class selector."
         ),

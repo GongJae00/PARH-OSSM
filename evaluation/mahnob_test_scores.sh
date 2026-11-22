@@ -2,7 +2,7 @@
 # The scoring of the MAHNOB-HCI participants of one split and the Supplementary tables of both datasets. With split
 # test it computes the errors of the test participants, so run it only when the placement is settled; with split
 # development it runs the same chain on the development participants, which shows a missing file or a crash before any
-# test score exists. It writes the rows of Tables 2 and 3 (main_tables.sh; for test also the development and
+# test score exists. It writes the rows of Table 2 (main_tables.sh; for test also the development and
 # all-trial rows), the confirmatory comparison of the frozen PARH-OSSM with the submitted procedure (run w2), the
 # reliability controls, the component ladder and the route exclusions, each once per belt placement, the waveform agreement under
 # the onset placement with its rows of the waveform table, the correlation of the errors of the observation pairs (on all

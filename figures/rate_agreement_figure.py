@@ -31,7 +31,7 @@ DATASETS = [("COHFACE", "cohface_frozen_trial_means.csv"), ("MAHNOB-HCI", "mahno
 REFERENCE_NAMES = {"hilbert": "Hilbert", "welch": "Welch", "count": "breath-count"}
 
 records_dir, reference, out_path = sys.argv[1:4]
-# MAHNOB-HCI on the evaluated split, the test participants for the main Tables 2 and 3
+# MAHNOB-HCI on the evaluated split, the test participants for the main Table 2
 split = pd.read_csv(os.path.join(records_dir, "mahnob_subject_split.csv"))
 mahnob_test_trials = set(split[split.split == (sys.argv[4] if len(sys.argv) > 4 else "test")].trial)
 fig, axes = plt.subplots(4, 4, figsize=(183 * MM, 168 * MM))

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Rows of the manuscript's Table 2 (methods on the same observations) and Table 3 (the component ladder), one
-# invocation of main_tables.py per dataset and split. The records are the CSVs of evaluation/window_rates.sh and
+# Rows of the manuscript's Table 2, its upper block (methods on the same observations) and its lower block (the
+# component ladder), one invocation of main_tables.py per dataset and split. The records are the CSVs of evaluation/window_rates.sh and
 # evaluation/bank_rates.sh, named <dataset>_<run>[_onset]_window_rates_three_references.csv.
 #   cohface: all 160 trials, PARH-OSSM on the first-frame observations; the row "as submitted" is the submitted
 #     procedure on them: run chest_only, the eight chest observations with priors computed from them

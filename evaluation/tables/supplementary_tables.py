@@ -8,7 +8,7 @@ MAE per condition under each reference, from motion_perturbation_summary.py's pe
 breathing-band coherence and the correlation above the breathing band of the observation pairs, from
 observation_error_correlation.py, and the change in error when a measurement route is left out of the bank, scored by
 reliability_controls_summary.compare. Reliability controls and the confirmatory tests, scored the same way. The rows
-of the main Tables 2 and 3 and of their MAHNOB-HCI counterparts, split from the outputs of main_tables.sh. Writing the
+of the two blocks of the main Table 2 and of their MAHNOB-HCI counterparts, split from the outputs of main_tables.sh. Writing the
 rows from the records keeps the typeset numbers equal to the analysis outputs.
 
 MAHNOB-HCI rows are those of the evaluated split, the test participants for the reported tables; scoring the
@@ -211,7 +211,7 @@ for _, label, frozen, submitted in PLACEMENTS:
 with open(os.path.join(out_dir, "S_confirmatory.tex"), "w") as f:
     f.write("\n".join(lines[:-1]) + "\n")
 
-# Rows of the main Tables 2 and 3 (T_*) and of their MAHNOB-HCI counterparts in the Supplementary (S_*), from the
+# Rows of the two blocks of the main Table 2 (T_*) and of their MAHNOB-HCI counterparts in the Supplementary (S_*), from the
 # outputs of main_tables.sh: COHFACE in cohface_main_tables.tex; MAHNOB-HCI in mahnob_<split>_main_tables.tex,
 # whose blocks follow a "% placement" line, a "% Table" line, and the dataset line that names the evaluated split.
 def main_table_blocks(path):

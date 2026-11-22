@@ -18,7 +18,7 @@ authors:
 repository-code: "https://github.com/GongJae00/PARH-OSSM"
 license: GPL-3.0-only
 version: "1.1.0"
-abstract: "Code of the article: the nine video-motion observations of the chest and upper torso, the PARH-OSSM multichannel oscillator state-space filter, its comparison methods, and the scripts that produce every reported table and figure on COHFACE and MAHNOB-HCI."
+abstract: "Code of the article: the nine video-motion observations of the chest and upper torso, three of which form the reported bank, the PARH-OSSM multichannel filter (Physiology-Aligned Regime-Adaptive Harmonic Oscillatory State-Space Model), its comparison methods, and the scripts that produce every reported table and figure on COHFACE and MAHNOB-HCI."
 keywords:
   - contactless respiration
   - respiratory rate

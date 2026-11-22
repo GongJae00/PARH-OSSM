@@ -36,7 +36,7 @@ else:
 windows = pd.read_csv(os.path.join(records_dir, frozen))
 if trials is not None:
     windows = windows[windows.trial.isin(trials)]
-# the trials where direct P1D is computable, the common set of Tables 2 and 3 (main_tables.py)
+# the trials where direct P1D is computable, the common set of Table 2 (main_tables.py)
 windows = windows[windows.trial.isin(windows.dropna(subset=["direct_p1d_welch_bpm"]).trial.unique())]
 references = windows[["trial", "window", f"{reference}_reference_bpm"]]
 fused = pd.read_csv(os.path.join(records_dir, fusion))

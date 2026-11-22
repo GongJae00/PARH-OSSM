@@ -2,7 +2,7 @@
 
 The loader places the video at the end of the BDF record (tail alignment). Every MAHNOB-HCI BDF
 marks the stimulus onset at 30.0 s on its Status channel, and the waveform evidence on the
-development subjects (belt_waveform_fit.py, the edge-trimmed scans) puts the video start there for
+development subjects (evaluation/waveform/onset_alignment_waveform.py) puts the video start there for
 most subjects. The other trigger-defined placement keeps the same number of belt samples, starting
 at the onset; a belt record that ends before the video does yields fewer reference samples, and the
 window rates then score only the windows that lie inside it. Only `gt` changes; the estimates,

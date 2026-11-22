@@ -16,7 +16,7 @@ marks the transient, the time of the largest median over the observations of |z|
 
 usage: architecture_figure.py <nine-observation figure png> <observation pkl> <final pkl> <out.pdf>
 The article's Figure 1 shows MAHNOB-HCI session 10 from the reported run: <final pkl> is mahnob_10.pkl in the
-onset-aligned final data of bank_b3.
+onset-aligned final data of the `frozen` run.
 """
 import json
 import pickle

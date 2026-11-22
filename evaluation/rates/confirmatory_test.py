@@ -17,7 +17,7 @@ of the trial-mean estimate on the trial-mean reference (1 when the estimate foll
 between trials, 0 when it stays at one rate); the median over subjects of the within-subject
 Spearman correlation between the trial means (does the estimate follow a subject's rate from one
 trial to the next); and the median over trials of the Pearson correlation between the window
-estimates and the window references (tracking within a trial, the r of the paper's Table 1).
+estimates and the window references (tracking within a trial, the r of the paper's Table 2).
 
 usage: confirmatory_test.py <frozen window rates csv> <submitted window rates csv> <split csv> <evaluated split: test|development>
 """
