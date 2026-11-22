@@ -32,9 +32,11 @@ python evaluation/waveform_table.py "$records" cohface "$out/T_waveform_cohface.
 python evaluation/observation_error_correlation.py "$base" "$records/cohface_error_correlation.csv" - "$jobs" \
   > "$out/cohface_error_correlation.txt"
 
-for c in "${controls[@]}" "${rungs[@]}" "${exclusions[@]}"; do
-  echo "$c=$records/cohface_${c}_window_rates_three_references.csv:parh_track_bpm"
-done | xargs python evaluation/reliability_controls_summary.py "$frozen_csv" none all > "$out/cohface_controls_ladder_exclusion.txt"
+# three families, as on MAHNOB-HCI: the reliability controls, the stages, and the route exclusions
+for family in "${controls[*]}" "${rungs[*]}" "${exclusions[*]}"; do
+  for c in $family; do echo "$c=$records/cohface_${c}_window_rates_three_references.csv:parh_track_bpm"; done |
+    xargs python evaluation/reliability_controls_summary.py "$frozen_csv" none all
+done > "$out/cohface_controls_ladder_exclusion.txt"
 
 python evaluation/rate_agreement.py COHFACE "$frozen_csv" \
   "$records/cohface_observation_fusion_window_rates.csv:median_fusion_bank_bpm" \

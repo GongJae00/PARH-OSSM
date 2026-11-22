@@ -55,8 +55,10 @@ for reference, _ in REFERENCES:
         trials = trials[trials.reference == reference].copy()
         if dataset == "MAHNOB-HCI":
             trials = trials[trials.trial.isin(MAHNOB_TRIALS)]
-        edges = trials[trials.method == "parh_track"].reference_bpm.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
-        trials["tercile"] = pd.cut(trials.reference_bpm, edges, labels=TERCILES, include_lowest=True)
+        # one tercile per trial, from its PARH-OSSM trial-mean reference, so every method is summarized on the same trials
+        parh = trials[trials.method == "parh_track"].set_index("trial").reference_bpm
+        edges = parh.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
+        trials["tercile"] = trials.trial.map(pd.cut(parh, edges, labels=TERCILES, include_lowest=True))
         ranges = " & ".join(f"\\multicolumn{{2}}{{c}}{{{edges[k]:.1f}--{edges[k + 1]:.1f}}}" for k in range(3))
         lines.append(f"\\multicolumn{{7}}{{l}}{{\\textit{{{dataset}}}, {trials.trial.nunique()} trials}} \\\\")
         lines.append(f"\\quad Reference rate (bpm) & {ranges} \\\\")

@@ -69,8 +69,10 @@ for (r, m), g in trials.groupby(["reference", "method"], sort=False):
 print("\nBy tercile of the trial-mean reference rate: median MAE / mean bias / share of trials with MAE > 5 bpm")
 for r in REFERENCES:
     g = trials[trials.reference == r].copy()
-    edges = g[g.method == "parh_track"].reference_bpm.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
-    g["tercile"] = pd.cut(g.reference_bpm, edges, labels=["low", "middle", "high"], include_lowest=True)
+    # one tercile per trial, from its PARH-OSSM trial-mean reference, so every method is summarized on the same trials
+    parh = g[g.method == "parh_track"].set_index("trial").reference_bpm
+    edges = parh.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
+    g["tercile"] = g.trial.map(pd.cut(parh, edges, labels=["low", "middle", "high"], include_lowest=True))
     print(f"  {r}: tercile edges {', '.join(f'{e:.1f}' for e in edges)} bpm")
     table = g.groupby(["method", "tercile"], observed=True).agg(
         median_MAE=("MAE", "median"), bias=("difference_bpm", "mean"), over_5=("MAE", lambda x: np.mean(x > 5)))

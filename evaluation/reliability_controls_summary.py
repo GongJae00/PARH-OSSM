@@ -3,9 +3,11 @@
 Scored as confirmatory_test.py scores the frozen method: per trial and reference the MAE over the windows
 where both exist, with at least 10 such windows, on the trials where direct P1D is computable; per subject
 the median over its trials of (control MAE - frozen MAE), positive when the frozen method is better; the
-Wilcoxon signed-rank test over subjects. The twelve comparisons (four controls, three references) form
-their own Benjamini-Hochberg family, apart from the six confirmatory tests. The constant predictor
-(median trial-mean reference of the development trials) is shown beside them and not tested here.
+Wilcoxon signed-rank test over subjects. The comparisons of one call (its comparators, three references
+each) form their own Benjamini-Hochberg family, apart from the six confirmatory tests and apart from the
+other calls; the q column names its size. The scoring scripts call it once for the reliability controls,
+once for the stages and once for the route exclusions. The constant predictor (median trial-mean reference
+of the development trials) is shown beside them and not tested here.
 
 The computation is compare(), which supplementary_tables.py calls for the family-exclusion table.
 
