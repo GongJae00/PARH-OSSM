@@ -25,54 +25,60 @@ displacement. (c) The state-space model and its smoothed state: the breathing os
 slow baseline, and an aperiodic residual. (d) The rate track and the smoothed waveform.</sub></p>
 <br>
 
-1. **Observations.** Optical flow (OF) measures the vertical velocity of the texture in a chest strip placed from
+1. **Data.** COHFACE (160 trials of 40 participants) and MAHNOB-HCI (488 sessions) film seated participants
+   who wear a respiratory belt, and both frame the face large and central. The belt signal is the reference: no
+   step of the method reads it, and the evaluation reads it to score the estimates. COHFACE was used to build the
+   method. MAHNOB-HCI participants were split into 9 development and 18 test participants; the development
+   participants were used for the choices of the revision, and the test participants were scored once, after the
+   method was fixed. The MAHNOB-HCI belt recording is longer than the video and does not store where the video lies
+   in it, so the reference starts at the stimulus onset, the position the development participants supported, and
+   every MAHNOB-HCI result is also computed with the reference ending with the recording.
+2. **Observations.** Optical flow (OF) measures the vertical velocity of the texture in a chest strip placed from
    the shoulder landmarks of the first frame, and the one-dimensional profile (P1D) measures the vertical shift of
    the strip's row-intensity profile between frames, with the cross-correlation peak refined by quadratic
    interpolation. Torso displacement is the vertical shift of a box below the face against a keyframe renewed every
-   second, so it stays in the image when a head-centred framing pushes the shoulders out of it; its errors
-   accumulate at each renewal. The extraction computes six further signals that the bank leaves out
-   (`estimate/bank.py`). Four repeat a measurement already in the bank: the OF bridge integrates OF, and the
-   linear, cubic, and consensus P1D routes refine the same correlation peak. The filter treats the errors of its
-   observations as independent, so a repeated measurement would count its error twice. The other two, the
-   difference of frames (DoF) and the DoF bridge, count and sign the pixels whose brightness changes, so they also
-   respond to changes of light. Head and posture motion enter all three observations. Before filtering, every
-   observation is aligned to one anchor observation, which removes the quarter cycle by which a velocity leads a
-   displacement.
-2. **Estimation.** Each observation is first tracked alone by an oscillator Kalman filter, OSSM-KF, which is also
+   second, so it stays in the image when the framing pushes the shoulders out of it; its errors accumulate at each
+   renewal. These three form the bank, the observations the method reads. The extraction computes six further
+   signals that the bank leaves out (`estimate/bank.py`). Four repeat a measurement already in the bank: the OF
+   bridge integrates OF, and the linear, cubic, and consensus P1D variants refine the same correlation peak. Because
+   the filter of item 3 treats the errors of its observations as independent, a repeated measurement would count
+   its error twice. The other two, the difference of frames (DoF) and the DoF bridge, count and sign the pixels
+   whose brightness changes, so they also respond to changes of light. Before filtering, every observation is
+   aligned to one anchor observation, which removes the quarter cycle by which a velocity leads a displacement.
+   Head and posture motion enter all three observations, each in its own way, so the observation that carries the
+   breath can change within a trial.
+3. **Estimation.** Each observation is first tracked alone by an oscillator Kalman filter, OSSM-KF, which is also
    the single-observation method of the article. PARH-OSSM then filters the three together as noisy views of one
    state: a breathing oscillation, its second harmonic for the asymmetry of inhalation and exhalation, a baseline
    drift, and an aperiodic residual, so that drift and irregular motion go to their own components rather than to
    the oscillation. The observation law sets how much each observation counts. The measurement variance of each
-   observation, estimated from its innovations, is divided by a trust computed at each frame from the quality of
-   those innovations, the agreement between observations in rate and phase, and target observability, which
-   scores how clearly the window shows one respiratory rate. The variances of all observations rise together
+   observation, estimated from its innovations, is divided by a trust computed at each frame from signal quality,
+   judged by those innovations, the agreement between observations in rate and phase, and target observability,
+   which scores how clearly the window shows one respiratory rate. The variances of all observations rise together
    when that rate is ambiguous. The Kalman filter and the Rauch–Tung–Striebel smoother run with these variances,
    and the waveform is read from the smoothed state. The rate combines the phase rate of the smoothed oscillation
    with a readout of the OSSM-KF tracks, in which each observation forms its own family, weighted by reliability
    priors of each family and corrected by a posterior over candidate rates. Reliability thus enters twice, as the
    trust of each observation in the filter and as the prior of each family in the readout; both are computed from
-   the video observations alone, and no step reads the respiratory belt. Table 3 of the article adds these parts
-   one at a time: the multichannel filter, the readout, the observation law, target observability and signal
+   the video observations alone.
+4. **Evaluation.** The rate is scored in 30-s windows under three definitions of the belt's rate (Hilbert, Welch,
+   and breath count), because a method scores best under the definition that shares its estimator. It is compared
+   with methods that read the same three observations, with the method as submitted, which reads eight chest
+   observations, and with a constant predictor that outputs the typical rate of the cohort, which shows how much of
+   a low error comes from staying near that rate. On the MAHNOB-HCI test participants, six confirmatory comparisons
+   set PARH-OSSM against the constant predictor and against the submitted version under each reference definition,
+   corrected together for multiple testing. The slope of the trial-mean estimate on the trial-mean reference shows
+   whether a method follows the differences in rate between trials. The waveform is scored by its concordance
+   correlation coefficient (CCC) with the belt after a shift of up to ±2 s. Two nulls bound that agreement: the
+   belts of other participants give the agreement expected by chance, and phase-randomized copies of the trial's
+   own belt keep its rate and change only the timing of its breaths. Table 3 of the article adds the parts of item
+   3 one at a time: the multichannel filter, the readout, the observation law, target observability and signal
    quality, and the rate posterior, which completes PARH-OSSM. Three controls each remove one use of reliability
    and keep everything else: `equal_filter` replaces the trust of each observation by its mean over the
    observations at the same frame, `equal_readout` gives every family the mean of the family priors in each
-   window, and `shuffled_readout` permutes the windows of each family's priors within the trial.
-3. **Evaluation.** The rate is scored in 30-s windows under three definitions of the belt's rate (Hilbert, Welch,
-   and breath count), because a method scores best under the definition that shares its estimator. It is compared
-   with methods that read the same three observations and with a constant predictor that outputs the typical rate
-   of the cohort, which shows how much of a low error comes from staying near that rate; the slope of the
-   trial-mean estimate on the trial-mean reference shows whether a method follows the differences in rate between
-   trials. The waveform is scored by its concordance correlation coefficient (CCC) with the belt after a shift of
-   up to ±2 s. Two nulls bound that agreement: the belts of other participants give the agreement expected by
-   chance, and phase-randomized copies of the trial's own belt keep its rate and change only the timing of its
-   breaths. COHFACE was used to build the method. MAHNOB-HCI participants were split into 9 development and 18
-   test participants. The development participants were used for the choices of the revision, the bank of three
-   observations among them, and the test participants were scored once, after the method was fixed, in six
-   confirmatory comparisons: PARH-OSSM against the constant predictor and against the submitted version of the
-   method, which reads eight chest observations, under each reference definition, corrected together for
-   multiple testing. The MAHNOB-HCI belt recording is longer than the video and does not store where the video
-   lies in it, so the reference starts at the stimulus onset, the position the development participants
-   supported, and every MAHNOB-HCI result is also computed with the reference ending with the recording.
+   window, and `shuffled_readout` permutes the windows of each family's priors within the trial. Each route
+   exclusion reruns PARH-OSSM without one observation of the bank, its route, and keeps the priors of the whole
+   bank.
 
 ## Layout
 
@@ -103,7 +109,7 @@ tests/          tests that pin the filters, the reference rates, the bank, the c
 | Tables 2 and 3, constant predictor | `evaluation/main_tables.sh`, `main_tables.py` |
 | Table 4, waveform agreement | `evaluation/bounded_lag_waveform.py`, `waveform_table.py` |
 | Waveform nulls | `evaluation/phase_randomized_null.py` |
-| Figure 2 | `figures/case_figure.py` |
+| Figures 1 and 2 | `figures/architecture_figure.py`, `case_figure.py` |
 | Confirmatory tests | `evaluation/confirmatory_test.py`, `mahnob_test_scores.sh` |
 | Agreement across trials | `evaluation/rate_agreement.py`, `stage_slopes.py`, `observation_track_slope.py` |
 | Agreement figures | `figures/rate_agreement_figure.py` |
@@ -113,14 +119,24 @@ tests/          tests that pin the filters, the reference rates, the bank, the c
 
 The extraction stores nine observations in each trial's pickle, under the names `of_farneback`, `of_disp_bridge`,
 `DoF`, `dof_disp_bridge`, `profile1D linear`, `profile1D quadratic`, `profile1D cubic`, `profile1d_consensus`, and
-`torso_shift`, in the order of item 1. The bank keeps `of_farneback`, `profile1D quadratic`, and `torso_shift`;
+`torso_shift`, in the order of item 2. The bank keeps `of_farneback`, `profile1D quadratic`, and `torso_shift`;
 `python estimate/bank.py labels` prints them and `python estimate/bank.py drop` prints the six it removes. A row
 ending in `__kfstd` holds the OSSM-KF track of one observation, and a row ending in `__parh_ossm` the PARH filter run
-on that observation alone; removing an observation removes all three of its rows. A run is a folder of
+on that observation alone, so removing an observation removes these two rows with it. A run is a folder of
 pickles written by `estimate/materialize.sh`, and its window rates are written to
 `<dataset>_<run>_window_rates_three_references.csv`, with `_onset` before `_window` for the MAHNOB-HCI belt that
-starts at the stimulus onset. The runs are `frozen` (PARH-OSSM), the stages and controls of `materialize.sh`, the
-route exclusions `no_of`, `no_p1d`, and `no_torso`, `with_dof`, `chest_only` (COHFACE), and `w2` (MAHNOB-HCI).
+starts at the stimulus onset. The runs are these:
+
+| Run | Method | In the article |
+|---|---|---|
+| `frozen` | PARH-OSSM | Tables 2–4 |
+| `plain_multichannel`, `readout`, `observation_law`, `observability` | the stages before the rate posterior | Table 3 |
+| `equal_filter`, `equal_readout`, `shuffled_readout` | reliability controls | Supplementary |
+| `no_of`, `no_p1d`, `no_torso` | route exclusions | Supplementary |
+| `with_dof` | the bank with DoF and the DoF bridge added back | Supplementary |
+| `chest_only` | COHFACE: PARH-OSSM on the eight chest observations | Table 2, as submitted |
+| `w2` | MAHNOB-HCI: the submitted method with its stored priors | Table 2, as submitted |
+
 `python estimate/bank.py routes` prints the route runs that `mahnob_test_scores.sh` and `cohface_scores.sh` read.
 
 ## Running
@@ -128,25 +144,28 @@ route exclusions `no_of`, `no_p1d`, and `no_torso`, `with_dof`, `chest_only` (CO
 The code runs on Python 3.10 with the packages in `requirements.txt`. COHFACE
 (<https://www.idiap.ch/en/scientific-research/data/cohface>) and MAHNOB-HCI (<https://mahnob-db.eu/>) are obtained
 from their providers under their access terms and are not redistributed here. Commands run from the repository
-root, and each `<...>` is a folder of your choice. `--no-caches` makes the extraction compute every observation
+root, and each `<...>` is a folder of your choice. `python -m pytest` runs the tests, which pin the filters, the
+reference rates, the bank, and the controls. `--no-caches` makes the extraction compute every observation
 from the video even when the dataset folder holds observation files of an earlier run. The COHFACE and MAHNOB-HCI
 steps give the rows of Tables 2 and 3; the steps after them give the reliability controls and route exclusions, the
-confirmatory tests on the MAHNOB-HCI test participants, Table 4, and the Supplementary tables.
+confirmatory tests on the MAHNOB-HCI test participants, Table 4, and the Supplementary tables, and the last
+step draws the figures.
 
 ### COHFACE
 
-The runs read `data.cfr.avi`, a copy of each COHFACE `data.avi` at a constant 20 frames per second, placed beside
-it. The reported copies were made with ffmpeg 6.1 under settings that were not recorded;
-`ffmpeg -i data.avi -vsync cfr -r 20 -c:v mpeg4 -q:v 2 data.cfr.avi` makes a copy of the same frame rate and codec,
-though not a byte-identical one.
-
-1. Extract the nine observations from `data.cfr.avi`. The chest box stays where the first frame placed it
+1. Beside each COHFACE `data.avi`, make `data.cfr.avi`, a copy at a constant 20 frames per second. The reported
+   copies were made with ffmpeg 6.1 under settings that were not recorded; this command makes a copy of the same
+   frame rate and codec, though not a byte-identical one:
+   ```
+   ffmpeg -i data.avi -vsync cfr -r 20 -c:v mpeg4 -q:v 2 data.cfr.avi
+   ```
+2. Extract the nine observations from `data.cfr.avi`. The chest box stays where the first frame placed it
    (`configs/cohface_first_frame_roi.json`), and the torso displacement is computed inside the extraction:
    ```
    python observations/run_shards.py --dataset COHFACE --dataset-root <COHFACE folder> \
        --config configs/cohface_first_frame_roi.json --work <cohface dir> --shards 8 --no-caches
    ```
-2. Remove the six observations the bank leaves out, and compute the reliability priors of the bank. The same script
+3. Remove the six observations the bank leaves out, and compute the reliability priors of the bank. The same script
    with `chest_only` gives the eight chest observations and their priors, the input of the row "as submitted" of
    Table 2, and with `with_dof` the bank with DoF and the DoF bridge added back:
    ```
@@ -154,7 +173,7 @@ though not a byte-identical one.
    estimate/bank_priors.sh COHFACE <cohface dir>/data <cohface chest> 8 chest_only
    estimate/bank_priors.sh COHFACE <cohface dir>/data <cohface with_dof> 8 with_dof
    ```
-3. Run PARH-OSSM (`frozen`), the four stages of Table 3 before it, PARH-OSSM on the chest bank, and PARH-OSSM on the
+4. Run PARH-OSSM (`frozen`), the four stages of Table 3 before it, PARH-OSSM on the chest bank, and PARH-OSSM on the
    bank with DoF added back:
    ```
    for run in frozen plain_multichannel readout observation_law observability; do
@@ -166,7 +185,7 @@ though not a byte-identical one.
    estimate/materialize.sh frozen <cohface with_dof>/data \
        <cohface with_dof>/priors_group.csv <cohface runs>/with_dof 8
    ```
-4. Compute the window rates, those of the methods without a filter (`bank_rates.sh`), and the table rows; the `-`
+5. Compute the window rates, those of the methods without a filter (`bank_rates.sh`), and the table rows; the `-`
    stands for the MAHNOB-HCI folder, which COHFACE does not use:
    ```
    evaluation/window_rates.sh cohface <cohface dir>/data <cohface runs> <records> 8 - \
@@ -177,7 +196,7 @@ though not a byte-identical one.
 
 ### MAHNOB-HCI
 
-MAHNOB-HCI differs in three ways. Its 488 sessions with all eight chest observations are used
+MAHNOB-HCI differs in four ways. Its 488 sessions with all eight chest observations are used
 (`evaluation/mahnob_common488_sessions.txt`), and the torso displacement is measured once per session and passed to
 the extraction as a cache. The row "as submitted" of Table 2 is the submitted method itself, which reads the eight
 chest observations of the submitted extraction (`configs/mahnob.json`, a chest box refreshed every 10 frames) with
@@ -196,7 +215,8 @@ writes both when it is given the MAHNOB-HCI folder.
        --trials evaluation/mahnob_common488_sessions.txt --torso-cache <torso cache> --no-caches
    ```
 2. Remove the six observations the bank leaves out, compute the reliability priors of the bank and of the bank with
-   DoF added back, and extract the eight chest observations of the submitted method:
+   DoF added back, and extract the eight chest observations of the submitted method. The first argument of
+   `bank_priors.sh` only names the dataset in the priors table; the priors read no belt, so it sets no placement:
    ```
    estimate/bank_priors.sh MAHNOB_tailaligned <mahnob dir>/data <mahnob bank> 8
    estimate/bank_priors.sh MAHNOB_tailaligned <mahnob dir>/data <mahnob with_dof> 8 with_dof
@@ -250,8 +270,9 @@ the Supplementary tables of both datasets.
    evaluation/window_rates.sh mahnob <mahnob dir>/data <mahnob runs> <records> 8 \
        <MAHNOB-HCI folder> $variants
    ```
-2. Measure the head motion of every trial, and run the frozen method on the COHFACE videos with controlled
-   translation, rotation, and brightness changes:
+2. Measure the head motion of every trial, writing the face track of each trial to `<face tracks>`, and run the
+   frozen method on the COHFACE videos with controlled translation, rotation, and brightness changes, written to
+   `<perturbed dir>`:
    ```
    python evaluation/head_motion.py <COHFACE folder> <MAHNOB-HCI folder> <face tracks> 8 \
        <records>/cohface_frozen_window_rates_three_references.csv \
@@ -261,17 +282,39 @@ the Supplementary tables of both datasets.
        <perturbed dir> <records> 8 translation:0.5 translation:1 translation:2 \
        rotation:0.25 rotation:0.5 rotation:1 brightness:0.01 brightness:0.02 brightness:0.05
    ```
-3. Score COHFACE, then the MAHNOB-HCI test participants, into the folder of the tables. With `development` as the
-   last argument, `mahnob_test_scores.sh` runs the same chain on the development participants, which shows a missing
-   file or a crash before any test score exists:
+3. Score COHFACE, then the MAHNOB-HCI participants, into the folder of the tables. The first MAHNOB-HCI command runs
+   the chain on the development participants, which shows a missing file or a crash before any test score exists;
+   the second scores the test participants. Each writes the rows of the article's tables and of the Supplementary
+   tables, and `mahnob_test_scores.sh` also the agreement figures of the Supplementary:
    ```
    evaluation/cohface_scores.sh <records> <tables> <cohface dir>/data \
        <cohface runs>/frozen/final/data 8
    evaluation/mahnob_test_scores.sh <records> <tables> <mahnob dir>/data <mahnob bank>/data \
+       <mahnob runs>/frozen/final/data <MAHNOB-HCI folder> 8 development
+   evaluation/mahnob_test_scores.sh <records> <tables> <mahnob dir>/data <mahnob bank>/data \
        <mahnob runs>/frozen/final/data <MAHNOB-HCI folder> 8
    ```
+4. Draw Figure 1 from the development session `mahnob_10` and Figure 2 from both datasets:
+   ```
+   python figures/architecture_figure.py <mahnob bank>/data/mahnob_10.pkl \
+       <mahnob runs>/frozen/final/data/mahnob_10.pkl \
+       <records>/mahnob_frozen_onset_window_rates_three_references.csv \
+       <figures>/F1_architecture.pdf
+   python figures/case_figure.py <records>/cohface_frozen_window_rates_three_references.csv \
+       <cohface runs>/frozen/final/data <cohface bank>/data \
+       <records>/mahnob_frozen_onset_window_rates_three_references.csv \
+       <mahnob runs>/frozen/onset_final/data <mahnob bank>/data \
+       evaluation/mahnob_subject_split.csv <figures>/F2_cases.pdf
+   ```
 
-`python -m pytest` runs the tests.
+## Other Videos
+
+The extraction reads the folder layouts of COHFACE and MAHNOB-HCI, one class for each in `observations/datasets.py`
+that lists the videos of the dataset and loads their belt signals. Another set of videos needs such a class; the
+belt it loads is stored beside the estimates and read only by the evaluation. The chest strip, the torso box, and
+the observations then follow from the video as in the steps above, the reliability priors are fitted on the bank of
+the new videos themselves (`estimate/bank_priors.sh`), and `estimate/materialize.sh frozen` writes each trial's
+estimates to `<run>/final/data`.
 
 ## Credits
 
