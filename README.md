@@ -74,10 +74,10 @@ tests/          tests that pin the filters, the references, the bank, the contro
 | Table 2 | `evaluation/main_tables.sh`, `evaluation/tables/main_tables.py` |
 | Table 3 | `evaluation/waveform/` |
 | Confirmatory tests | `evaluation/rates/confirmatory_test.py` |
-| Each observation tracked alone (Supplementary Table 9) | `evaluation/rates/single_track_errors.py` |
+| Each observation tracked alone (Results, large errors) | `evaluation/rates/single_track_errors.py` |
 | Agreement across trials | `evaluation/across_trials/` |
 | Error under motion | `evaluation/motion/`, `evaluation/motion_perturbation.sh` |
-| Supplementary tables | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
+| Tables of the analyses that the article reports in its text, and the parameter list | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
 | Figures | `figures/architecture_figure.py`, `case_figure.py`, `agreement_figure.py`, `rate_agreement_figure.py` |
 
 A run is a folder of per-trial pickles. `frozen` is this repository's name for the reported run. The first four
@@ -88,9 +88,9 @@ folders that the scoring scripts read, made as the paragraph after the commands 
 |---|---|---|
 | `frozen` | PARH-OSSM | Tables 2 and 3 |
 | `plain_multichannel`, `readout`, `observation_law`, `observability` | stages before the rate posterior | Table 2, lower block |
-| `equal_filter`, `equal_readout`, `shuffled_readout` | reliability controls | Supplementary |
-| `no_of`, `no_p1d`, `no_torso` | observations left out | Supplementary |
-| `with_dof` (folder) | DoF added back | Supplementary |
+| `equal_filter`, `equal_readout`, `shuffled_readout` | reliability controls | Results text |
+| `no_of`, `no_p1d`, `no_torso` | observations left out | code only |
+| `with_dof` (folder) | DoF added back | code only |
 | `chest_only`, `w2` (folders) | the submitted method on COHFACE and MAHNOB-HCI | Table 2 |
 
 ## Running
