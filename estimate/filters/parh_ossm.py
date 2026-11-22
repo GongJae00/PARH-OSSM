@@ -291,6 +291,11 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
     # Correlated variants inside the same semantic group must not count as
     # independent sensors in the Kalman update.
     ENABLE_GROUP_BALANCED_FUSION: bool = False
+    # Which observations share that count m_G: "family" (the construction family of the submitted code, which
+    # joins only P1D quadratic and P1D cubic) or "measurement" (every observation of one image measurement: OF
+    # and its bridge, DoF and its bridge, the four P1D interpolations, torso displacement). Both give m_G = 1 for
+    # the reported bank of OF, P1D quadratic, and torso displacement.
+    GROUP_BALANCE_KEY: str = "family"
 
     @staticmethod
     def _base_method_from_meta(run_meta: Dict, family_override: Optional[str] = None) -> str:
@@ -556,6 +561,19 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
             weighted *= 1.0 / (1.0 + float(self.STATE_ROLE_ABSTAIN_R_SCALE) * float(abstain[idx]))
             context[idx] = float(np.clip(weighted, 1e-6, 1.0))
         return context, role_values
+
+    @staticmethod
+    def _measurement_group_key(family: str) -> str:
+        name = str(family or "").strip().lower()
+        if "torso" in name:
+            return "torso_displacement"
+        if "dof" in name or "motion_energy" in name:
+            return "frame_difference"
+        if "profile" in name or "p1d" in name:
+            return "profile1d"
+        if name.startswith("of") or "optical" in name:
+            return "optical_flow"
+        return name or "unknown"
 
     def _family_group_key(self, family: str) -> str:
         sem = self._observation_family_semantics(str(family or ""))
@@ -3484,7 +3502,12 @@ class oscillator_PARH_OSSM(_BaseOscillatorHead):
 
         group_balance_scale = np.ones(n_obs, dtype=np.float64)
         if multichannel and bool(self.ENABLE_GROUP_BALANCED_FUSION):
-            groups = self._family_group_indices(observation_families, n_obs)
+            if str(self.GROUP_BALANCE_KEY).lower() == "measurement" and len(observation_families) == n_obs:
+                groups = {}
+                for idx, family in enumerate(observation_families):
+                    groups.setdefault(self._measurement_group_key(str(family)), []).append(idx)
+            else:
+                groups = self._family_group_indices(observation_families, n_obs)
             for idxs in groups.values():
                 scale = float(max(len(idxs), 1))
                 for idx in idxs:

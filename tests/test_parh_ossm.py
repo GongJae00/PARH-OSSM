@@ -25,3 +25,28 @@ def test_filtered_waveform_has_one_sample_per_frame():
     estimate = oscillator_PARH_OSSM().run(signals, FS)
 
     assert estimate["track_hz"].shape == (signals.shape[1],)
+
+
+NINE_OBSERVATIONS = ["of_farneback", "of_disp_bridge", "DoF", "dof_disp_bridge", "profile1D linear",
+                     "profile1D quadratic", "profile1D cubic", "profile1d_consensus", "torso_shift"]
+
+
+def groups_of(names, key):
+    head = oscillator_PARH_OSSM()
+    group = head._measurement_group_key if key == "measurement" else head._family_group_key
+    groups = {}
+    for name in names:
+        groups.setdefault(group(name), []).append(name)
+    return sorted(len(members) for members in groups.values())
+
+
+def test_measurement_grouping_counts_each_image_measurement_once():
+    # OF and its bridge, DoF and its bridge, the four P1D interpolations, torso displacement
+    assert groups_of(NINE_OBSERVATIONS, "measurement") == [1, 2, 2, 4]
+    # the construction families of the submitted code join only P1D quadratic and cubic
+    assert groups_of(NINE_OBSERVATIONS, "family") == [1, 1, 1, 1, 1, 1, 1, 2]
+
+
+def test_reported_bank_has_one_observation_per_group_under_both_keys():
+    bank = ["of_farneback", "profile1D quadratic", "torso_shift"]
+    assert groups_of(bank, "measurement") == groups_of(bank, "family") == [1, 1, 1]

@@ -233,6 +233,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--group-balance",
+        choices=["family", "measurement"],
+        default="family",
+        help=(
+            "Which observations share the group count m_G of the observation law: the construction family "
+            "(default, the reported runs) or the image measurement. Both give m_G = 1 for the reported bank."
+        ),
+    )
+    p.add_argument(
         "--enable-regime-observation-law",
         action="store_true",
         help=(
@@ -4084,6 +4093,7 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
             head.ENABLE_RESIDUAL_IDENTIFIABILITY_GUARD = True
             head.ENABLE_PHASE_ANCHORED_MORPHOLOGY = True
             head.ENABLE_GROUP_BALANCED_FUSION = True
+        head.GROUP_BALANCE_KEY = str(cfg.get("group_balance", "family"))
         run_meta = {
             "method_name": method_name,
             "base_method": str(cfg.get("parh_base_method", "of_disp_bridge")),
@@ -4096,6 +4106,7 @@ def _process_file(args: Tuple[str, str, Dict[str, object]]) -> Tuple[str, Option
             "calibrated_source_families": names,
             "rate_track_source": rate_track_source,
             "reliability_prior_scope": str(cfg.get("reliability_prior_scope", "all")),
+            "group_balance": str(cfg.get("group_balance", "family")),
             "input_file": path.name,
             "target_reliability_channel_prior": channel_reliability_priors,
             "target_reliability_windowed_prior": bool(channel_context_runtime is not None),
@@ -4234,6 +4245,7 @@ def main() -> int:
             str(args.readout_reliability_group_csv) if args.readout_reliability_group_csv else ""
         ),
         "reliability_prior_scope": str(args.reliability_prior_scope),
+        "group_balance": str(args.group_balance),
         "reliability_priors_by_video": _load_reliability_priors(args.reliability_group_csv),
         "windowed_reliability_priors_by_video": _load_windowed_reliability_priors(args.reliability_group_csv),
         "separate_reliability_csvs": bool(args.state_reliability_group_csv or args.readout_reliability_group_csv),
