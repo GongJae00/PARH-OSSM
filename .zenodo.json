@@ -3,7 +3,7 @@
   "upload_type": "software",
   "description": "Code of the article \"Video-Based Respiratory Rate Estimation via Multichannel Oscillator State-Space Fusion\" (Scientific Reports): the video-motion observations of the chest and upper torso, of which the reported bank keeps three, the PARH-OSSM multichannel oscillator state-space filter, its comparison methods, and the scripts that produce every reported table and figure on COHFACE and MAHNOB-HCI. The OF, DoF, and P1D observation operators originate in resPyre (https://github.com/phuselab/resPyre, GPL-3.0). The COHFACE and MAHNOB-HCI recordings are not redistributed.",
   "creators": [
-    {"name": "Cho, Young-Jae", "affiliation": "University of Ulsan"},
+    {"name": "Cho, YoungJae", "affiliation": "University of Ulsan"},
     {"name": "Kim, Do-Yup", "affiliation": "Incheon National University"},
     {"name": "Kim, Dae-Yeol", "affiliation": "University of Ulsan"},
     {"name": "Kim, Youngjun", "affiliation": "Changwon National University"}
