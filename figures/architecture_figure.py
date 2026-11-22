@@ -8,15 +8,15 @@ row: (d) the reliability-weighted observation law, (e) the oscillator state-spac
 photographs show an author, and illustrate the regions only. Each observation is drawn with its operator image from the submitted
 figure (frame stacks of the flow and difference images, the correlation curve and its fitted interpolant for the P1D
 routes, the torso box on the photograph). Every trace is the
-stored output of one development trial of the frozen run (MAHNOB-HCI session 10) over 5-50 s: the observations
+stored output of one development trial of the reported run (MAHNOB-HCI session 10) over 5-50 s: the observations
 band-passed to 0.08-0.5 Hz and scaled by their median absolute deviation, the share of each observation in the
 Kalman update, w_k = (1 / R_eff,k) / sum_j (1 / R_eff,j) from R_eff_t_channels, the RTS-smoothed state components
-on the scale of the fundamental, the rate track at the window centres, and the smoothed waveform. A light guide
+on the scale of the fundamental, the rate track of the filter at every frame, and the smoothed waveform. A light guide
 marks the transient, the time of the largest median over the observations of |z|.
 
-usage: architecture_figure.py <nine-observation figure png> <observation pkl> <final pkl> <window rates csv> <out.pdf>
+usage: architecture_figure.py <nine-observation figure png> <observation pkl> <final pkl> <out.pdf>
 The article's Figure 1 shows MAHNOB-HCI session 10 from the reported run: <final pkl> is mahnob_10.pkl in the
-onset-aligned final data of bank_b3 and <window rates csv> the onset-aligned MAHNOB-HCI window rates of the same run.
+onset-aligned final data of bank_b3.
 """
 import json
 import pickle
@@ -38,7 +38,7 @@ plt.rcParams.update({"font.family": "Liberation Sans", "mathtext.fontset": "cust
                      "mathtext.rm": "Liberation Sans", "mathtext.it": "Liberation Sans:italic",
                      "mathtext.bf": "Liberation Sans:bold"})
 
-source_png, observation_pkl, final_pkl, rates_csv, out_pdf = sys.argv[1:6]
+source_png, observation_pkl, final_pkl, out_pdf = sys.argv[1:5]
 WIDTH, HEIGHT = 175.9, 84.0
 SPAN_S, BAND_HZ = (5.0, 50.0), (0.08, 0.5)
 FRAME, BLOCK = "#c8c8c8", "#4a4a4a"
@@ -62,7 +62,6 @@ families = json.loads(estimate["meta"])["observation_families"]
 precision = 1.0 / np.asarray(estimate["diagnostics"]["R_eff_t_channels"], float)
 update_share = precision / precision.sum(axis=0)
 trial = final_pkl.rsplit("/", 1)[1][:-4]
-windows = pd.read_csv(rates_csv).query("trial == @trial")
 
 
 def band_passed(x):
@@ -207,9 +206,7 @@ for route, colour, members in ROUTES:
         draw_trace(trace, *shown(z), colour if in_bank else OBS, lw=0.55 if in_bank else 0.35)
         if in_bank:
             k = families.index(family)
-            ax.text(middle, 31.0, f"$o_{k + 1}(t)$", fontsize=6.5, ha="center", va="center")
-        if name == "of_farneback":
-            scale = (x, x + slot * 10 / (SPAN_S[1] - SPAN_S[0]), 11.4 + height + 8.2)
+            ax.text(middle, 30.4, f"$o_{k + 1}(t)$", fontsize=6.5, ha="center", va="center")
         x += slot + inner_gap
     x += route_gap - inner_gap
     route_end = x - route_gap
@@ -217,29 +214,22 @@ for route, colour, members in ROUTES:
     active = any(family is not None for _, _, family in members)
     ax.plot([route_start, route_start, route_end, route_end], [33.3, 34.2, 34.2, 33.3], color=colour, lw=0.6)
     ax.text((route_start + route_end) / 2, 36.4, route, fontsize=5.5, ha="center", va="center", color=INK)
-# time scale of the traces: a 10-s double arrow directly under the left end of the OF trace
-ax.add_patch(FancyArrowPatch((scale[0], scale[2]), (scale[1], scale[2]), arrowstyle="<|-|>,head_width=0.7,head_length=1.0",
-                             mutation_scale=1, lw=0.45, color=INK, shrinkA=0, shrinkB=0))
-ax.text(scale[1] + 0.6, scale[2], "10 s", fontsize=5, va="center")
-# what the frame means, in the title row of the panel
-ax.add_patch(Rectangle((right - 33.0, 2.1), 3.2, 2.2, fc="none", ec=INK, lw=1.0))
-ax.text(right - 29.0, 3.2, "used by the filter, $o_1$–$o_3$", fontsize=5.5, va="center")
 block_arrow(64.0, 41.2, 64.0, 44.6)
 
 # d: observation law; each row of the observation vector, its noise variance, its trust, and its update share
 panel(0.3, 44.8, 72.0, HEIGHT - 0.3, "d", "Reliability-weighted observation law")
 rows_y = [58.0, 63.2, 68.4]
 header_y = 52.4
-for x, text in [(13.0, "Observations"), (33.0, "Noise variances"), (45.6, "Trust"), (60.3, "Update share $s_{k,t}$")]:
+for x, text in [(13.0, "Observations"), (30.6, "Noise variances"), (43.2, "Trust"), (60.3, "Update share $s_{k,t}$")]:
     ax.text(x, header_y, text, fontsize=5.5, ha="center", va="center")
 bracket(8.2, 17.8, 55.2, 71.2)
-bracket(27.6, 38.4, 55.2, 71.2)
+bracket(25.2, 36.0, 55.2, 71.2)
 ax.text(4.6, 63.2, "$\\mathbf{y}_t$ =", fontsize=7, ha="center", va="center")
 for k, (y, family) in enumerate(zip(rows_y, families)):
     ax.text(13.0, y, f"$o_{k + 1}(t)$", fontsize=7, ha="center", va="center")
-    ax.text(33.0, y, f"$R^{{\\mathrm{{eff}}}}_{{{k + 1},t}}$", fontsize=7, ha="center", va="center")
-    ax.text(45.6, y, f"$\\pi_{{{k + 1},t}}$", fontsize=7, ha="center", va="center")
-    arrow(43.2, y, 39.6, y)
+    ax.text(30.6, y, f"$R^{{\\mathrm{{eff}}}}_{{{k + 1},t}}$", fontsize=7, ha="center", va="center")
+    ax.text(43.2, y, f"$\\pi_{{{k + 1},t}}$", fontsize=7, ha="center", va="center")
+    arrow(40.8, y, 37.2, y)
     strip = axes_at(50.6, y - 2.1, 70.0, y + 2.1, ylim=(0, 1))
     guide(strip)
     time, share = shown(update_share[k])
@@ -260,7 +250,7 @@ centres = [88.0, 102.0, 116.0]
 node_y, out_y, NODE = 53.2, 61.0, 3.2
 for x, sub in zip(centres, ["t-1", "t", "t+1"]):
     ax.add_patch(Circle((x, node_y), NODE, fc="white", ec=INK, lw=0.5))
-    ax.text(x, node_y, f"$\\mathbf{{x}}_{{{sub}}}$", fontsize=6, ha="center", va="center")
+    ax.text(x, node_y + 0.55, f"$\\mathbf{{x}}_{{{sub}}}$", fontsize=6, ha="center", va="center")
     arrow(x, node_y + NODE, x, out_y - 1.8)
     ax.text(x, out_y, f"$\\mathbf{{y}}_{{{sub}}}$", fontsize=6.5, ha="center", va="center")
 for x0, x1 in zip(centres[:-1], centres[1:]):
@@ -283,26 +273,27 @@ block_arrow(129.2, 63.2, 132.4, 63.2)
 
 # f: outputs
 panel(132.6, 44.8, WIDTH - 0.3, HEIGHT - 0.3, "f", "Outputs")
-rate = fig.add_axes((143.5 / WIDTH, 1 - 61.0 / HEIGHT, 30.0 / WIDTH, 9.6 / HEIGHT))
-rate.plot(windows.window + 15, windows.parh_track_bpm, color=PARH, lw=0.6)
-low, high = np.floor(windows.parh_track_bpm.min()) - 1, np.ceil(windows.parh_track_bpm.max()) + 1
+rate = fig.add_axes((141.0 / WIDTH, 1 - 63.0 / HEIGHT, 32.0 / WIDTH, 9.6 / HEIGHT))
+time, track_bpm = shown(60.0 * np.asarray(estimate["track_hz"], float).reshape(-1))
+rate.plot(time, track_bpm, color=PARH, lw=0.6)
+low, high = np.floor(track_bpm.min()) - 1, np.ceil(track_bpm.max()) + 1
 rate.set(xlim=SPAN_S, xticks=[10, 20, 30, 40, 50], xticklabels=[], ylim=(low, high), yticks=[low, high])
 rate.set_ylabel("Rate (bpm)", fontsize=5.5)
-waveform = fig.add_axes((143.5 / WIDTH, 1 - 75.2 / HEIGHT, 30.0 / WIDTH, 9.6 / HEIGHT))
+waveform = fig.add_axes((141.0 / WIDTH, 1 - 77.4 / HEIGHT, 32.0 / WIDTH, 9.6 / HEIGHT))
 draw_trace(waveform, *shown(median_z(np.asarray(estimate["z_full_smoothed"], float))), PARH, lw=0.5)
 waveform.set(xlim=SPAN_S, xticks=[10, 20, 30, 40, 50], ylim=(-3.3, 3.3), yticks=[])
 waveform.set_ylabel("Waveform", fontsize=5.5)
 waveform.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
 for axes in (rate, waveform):
     axes.tick_params(labelsize=5.5, pad=1, length=1.5, width=0.4)
-    axes.yaxis.set_label_coords(-0.16, 0.5)
+    axes.yaxis.set_label_coords(-0.12, 0.5)
     for spine in axes.spines.values():
         spine.set_linewidth(0.4)
     for side in ("top", "right"):
         axes.spines[side].set_visible(False)
     guide(axes)
-rate.text(TRANSIENT_S + 0.8, high - 0.06 * (high - low), "Transient", fontsize=5, color="#555555", va="top")
+rate.text(TRANSIENT_S + 0.8, low + 0.06 * (high - low), "Transient", fontsize=5, color="#555555", va="bottom")
 
 fig.savefig(out_pdf, dpi=600)
 print(f"{trial}: families {families}; transient {TRANSIENT_S:.1f} s; "
-      f"rate {windows.parh_track_bpm.min():.1f}-{windows.parh_track_bpm.max():.1f} bpm")
+      f"rate {track_bpm.min():.1f}-{track_bpm.max():.1f} bpm")

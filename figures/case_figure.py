@@ -94,7 +94,7 @@ TITLES = {"observations": "Belt and observations", "share": "Update share, 0 to 
           "rate": "Rate (bpm)"}
 PANEL_H, HEADER, TICKS, ROW_GAP = 34.0, 4.6, 7.4, 3.2
 ROW_Y = [6.0 + HEADER, 6.0 + HEADER + PANEL_H + TICKS + ROW_GAP + HEADER]
-HEIGHT = ROW_Y[1] + PANEL_H + TICKS + 6.0
+HEIGHT = ROW_Y[1] + PANEL_H + TICKS + 2.0
 LANE_UNITS, GAIN = 1.6, 0.26
 SHARE_H, SHARE_GAP = 9.6, 2.6
 SHORT = {"OF": "OF", "P1D": "P1D", "Torso displacement": "Torso"}
@@ -144,6 +144,25 @@ def area_key(x_mm, y_mm, text, colour):
     return key_text(x_mm, y_mm, text)
 
 
+def entry_width(text):
+    return 3.3 + TextPath((0, 0), text, size=5.5).get_extents().width * 25.4 / 72
+
+
+def keys_in_line(x_right, y_mm, entries, gap=2.4):
+    """Key entries on one line, ending at x_right: (text, colour, kind) with kind "line", "dotted", or "area"."""
+    x = x_right - sum(entry_width(text) for text, _, _ in entries) - gap * (len(entries) - 1)
+    for text, colour, kind in entries:
+        (area_key if kind == "area" else line_key)(x, y_mm, text, colour, **({"dotted": True} if kind == "dotted" else {}))
+        x += entry_width(text) + gap
+
+
+def keys_stacked(x_right, y_mm, entries, step=2.3):
+    """Key entries one per line, left-aligned so that the longest ends at x_right."""
+    x = x_right - max(entry_width(text) for text, _, _ in entries)
+    for k, (text, colour, kind) in enumerate(entries):
+        line_key(x, y_mm + k * step, text, colour, dotted=kind == "dotted")
+
+
 for key, (x0, x1) in COLUMNS.items():
     canvas.text((x0 + x1) / 2, 3.2, TITLES[key], fontsize=6, fontweight="bold", ha="center", va="center")
 
@@ -172,7 +191,9 @@ for row, case in enumerate(cases):
     name = (f"{case['name']}, subject {identifier[0]}, trial {identifier[1]}" if case["name"] == "COHFACE"
             else f"{case['name']}, session {identifier[0]}")
     canvas.text(0.6, top - HEADER + 1.6, "ab"[row], fontsize=8, fontweight="bold", va="center")
-    canvas.text(4.4, top - HEADER + 1.6, f"{name}; trial MAE {case['mae']:.2f} bpm", fontsize=6, va="center")
+    # the panel names its dataset only; the caption identifies the trial and gives its error
+    canvas.text(4.4, top - HEADER + 1.6, case["name"], fontsize=6, va="center")
+    print(f"{name}; trial MAE {case['mae']:.2f} bpm")
 
     # observations: the belt and the three observations of the bank, one lane each
     x0, x1 = COLUMNS["observations"]
@@ -215,13 +236,17 @@ for row, case in enumerate(cases):
     draw_trace(waveform, video_time[:z_smoothed.size], z_smoothed, PARH, lw=0.55)
     time_axis(waveform, span, 10 if span[1] - span[0] <= 70 else 20, bottom_row)
 
-    # window rates over the whole trial; the span of the other panels is shaded where it is shorter than the trial
+    # window rates over the whole trial, drawn at the window centres, so the axis runs from the first centre to the
+    # last; the span of the other panels is shaded where it is shorter than the trial
     x0, x1 = COLUMNS["rate"]
-    rate = axes_mm(x0, top, x1, top + PANEL_H, trial_span)
     centre = case["windows"].window + WIN / 2
+    centre_span = (float(centre.min()), float(centre.max()))
+    rate = axes_mm(x0, top, x1, top + PANEL_H, centre_span)
     values = case["windows"][rate_columns]
     low = np.floor(min(values.min().min(), case["constant"])) - 1
     high = np.ceil(max(values.max().max(), case["constant"])) + 1
+    if row == 0:  # room above the tracks for the key of this column
+        high = max(high, np.ceil(low + (max(values.max().max(), case["constant"]) - low) / 0.62))
     rate.set_ylim(low, high)
     if span != trial_span:
         rate.axvspan(*span, color="#ececec", lw=0, zorder=0)
@@ -234,17 +259,14 @@ for row, case in enumerate(cases):
     rate.spines["left"].set_linewidth(0.4)
     rate.yaxis.set_major_locator(MultipleLocator(2 if high - low <= 10 else 4))
     rate.tick_params(axis="y", length=1.5, pad=1, labelsize=5)
-    time_axis(rate, trial_span, 20 if trial_span[1] <= 70 else 40, bottom_row)
+    time_axis(rate, centre_span, 10 if centre_span[1] - centre_span[0] <= 40 else 20, bottom_row)
 
-# one key for both rows
-y_key = HEIGHT - 2.6
-x = 12.0
-x = line_key(x, y_key, "Belt; Hilbert reference rate", INK)
-x = line_key(x, y_key, "PARH-OSSM", PARH)
-x = line_key(x, y_key, "OSSM-KF", OSSM)
-x = line_key(x, y_key, "Constant predictor", NEUTRAL, dotted=True)
-x = area_key(x, y_key, "Chest ROI", CHEST)
-x = area_key(x, y_key, "Torso box", TORSO)
+# each column's key at its upper right in the first row, where the marks it names are first read
+y_key = ROW_Y[0] - HEADER + 1.6
+keys_in_line(COLUMNS["observations"][1], y_key, [("Chest ROI", CHEST, "area"), ("Torso box", TORSO, "area")])
+keys_in_line(COLUMNS["waveform"][1], y_key, [("Belt", INK, "line"), ("PARH-OSSM", PARH, "line")])
+keys_stacked(COLUMNS["rate"][1], ROW_Y[0] + 1.4, [("Hilbert reference", INK, "line"), ("PARH-OSSM", PARH, "line"),
+                                                 ("OSSM-KF", OSSM, "line"), ("Constant predictor", NEUTRAL, "dotted")])
 
 fig.savefig(out_path)
 fig.savefig(out_path.removesuffix(".pdf") + ".png", dpi=300)

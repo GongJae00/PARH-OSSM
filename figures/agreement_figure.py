@@ -60,8 +60,7 @@ shown_all = pd.concat([t[t.method.isin([m for m, _, _ in SCATTER])] for t in (co
 low = np.floor(shown_all[["estimate_bpm", "reference_bpm"]].min().min()) - 0.5
 high = np.ceil(shown_all[["estimate_bpm", "reference_bpm"]].max().max()) + 0.5
 span = high - low
-for panel, (trials, title, x0) in enumerate([(cohface, f"COHFACE, {cohface.trial.nunique()} trials", 13.0),
-                                              (mahnob, f"MAHNOB-HCI test, {mahnob.trial.nunique()} trials", 72.0)]):
+for panel, (trials, title, x0) in enumerate([(cohface, "COHFACE", 13.0), (mahnob, "MAHNOB-HCI test", 72.0)]):
     ax = axes_mm(x0, TOP, x0 + (BOTTOM - TOP), BOTTOM)
     cohort = trials[trials.method == "constant"].estimate_bpm.iloc[0]
     ax.plot([low, high], [low, high], color=GUIDE, lw=0.6, ls=(0, (3, 2)), zorder=1)
@@ -130,7 +129,7 @@ placed[order] = y
 for (value, name, colour), label_y in zip(ends, placed):
     ax.annotate(name, xy=(2, value), xytext=(2.45, label_y), fontsize=5.2, color=INK, va="center",
                 annotation_clip=False, arrowprops=dict(arrowstyle="-", color=colour, lw=0.5, shrinkA=0, shrinkB=1.5))
-letter(x0 - 11.0, 4.6, "c", "MAHNOB-HCI test, bias by tercile")
+letter(x0 - 11.0, 4.6, "c", "MAHNOB-HCI test")
 for side in ("top", "right"):
     for a in fig.axes:
         a.spines[side].set_visible(False)
