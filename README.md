@@ -1,4 +1,4 @@
-<h1 align="center">Video-Based Respiratory Rate Estimation via<br>Reliability-Weighted Multichannel State-Space Fusion</h1>
+<h1 align="center">Video-Based Respiratory Rate Estimation via<br>Multichannel Oscillator State-Space Fusion</h1>
 
 <p align="center">
 Young-Jae Cho<sup>1,†</sup>, Do-Yup Kim<sup>2,†</sup>, Dae-Yeol Kim<sup>1,&#42;</sup>, Youngjun Kim<sup>3,&#42;</sup><br>
