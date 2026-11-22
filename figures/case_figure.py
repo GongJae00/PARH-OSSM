@@ -33,6 +33,7 @@ import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.textpath import TextPath
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import MultipleLocator
@@ -42,7 +43,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from evaluation.reference.belt_reference import filter_RW, recorded_belt
 from bank import BANK
-from figure_style import CHEST, INK, MM, NEUTRAL, OBS, OSSM, PARH, TORSO, draw_share, draw_trace, median_z, tint
+from figure_style import CHEST, INK, MM, NEUTRAL, OSSM, PARH, TORSO, draw_share, draw_trace, median_z, tint
 
 matplotlib.use("pdf")
 WIN, MIN_WINDOWS, MIN_HZ, MAX_HZ = 30, 10, 0.08, 0.5
@@ -128,14 +129,19 @@ def line_key(x_mm, y_mm, text, colour, dotted=False):
     """A name in ink after a short stroke of its line's colour, so that colour is never the only cue."""
     canvas.plot([x_mm, x_mm + 2.6], [y_mm, y_mm], color=colour, lw=0.9, solid_capstyle="butt",
                 ls=(0, (1, 1.2)) if dotted else "-")
+    return key_text(x_mm, y_mm, text)
+
+
+def key_text(x_mm, y_mm, text):
+    """The name of a key entry; returns where the next entry starts, a fixed gap after the measured text."""
     canvas.text(x_mm + 3.3, y_mm, text, fontsize=5.5, color=INK, va="center")
-    return x_mm + 3.3 + 0.93 * len(text) + 4.5
+    width_pt = TextPath((0, 0), text, size=5.5).get_extents().width
+    return x_mm + 3.3 + width_pt * 25.4 / 72 + 5.0
 
 
 def area_key(x_mm, y_mm, text, colour):
     canvas.add_patch(plt.Rectangle((x_mm, y_mm - 0.9), 2.6, 1.8, color=tint(colour), lw=0))
-    canvas.text(x_mm + 3.3, y_mm, text, fontsize=5.5, color=INK, va="center")
-    return x_mm + 3.3 + 0.93 * len(text) + 4.5
+    return key_text(x_mm, y_mm, text)
 
 
 for key, (x0, x1) in COLUMNS.items():
@@ -176,11 +182,12 @@ for row, case in enumerate(cases):
     draw_trace(traces, belt_time[shown], z_belt, INK, gain=GAIN, lw=0.5)
     canvas.text(LABEL_X, top + PANEL_H * 0.5 / 4.15, "Belt", fontsize=5.5, ha="right", va="center")
     first = int(OBSERVATION_START_SEC * fps)
-    for lane, (method, _, label, _) in enumerate(OBSERVATIONS, start=1):
+    for lane, (method, _, label, colour) in enumerate(OBSERVATIONS, start=1):
         observation = case["observations"][method][first:n_video]
         observation = filter_RW(observation, fps, lo=MIN_HZ, hi=MAX_HZ).reshape(-1) if observation.std() > 0 else observation
         time = video_time[first:first + observation.size]
-        draw_trace(traces, time, median_z(observation), OBS, offset=-lane * LANE_UNITS, gain=GAIN, lw=0.45)
+        # each observation in its region's colour, as in Fig. 1c and in its update share
+        draw_trace(traces, time, median_z(observation), colour, offset=-lane * LANE_UNITS, gain=GAIN, lw=0.45)
         canvas.text(LABEL_X, top + PANEL_H * (lane + 0.5) / 4.15, SHORT.get(label, label), fontsize=5.5,
                     ha="right", va="center")
     time_axis(traces, span, 10 if span[1] - span[0] <= 70 else 20, bottom_row)
@@ -218,7 +225,7 @@ for row, case in enumerate(cases):
     rate.set_ylim(low, high)
     if span != trial_span:
         rate.axvspan(*span, color="#ececec", lw=0, zorder=0)
-        rate.text((span[0] + span[1]) / 2, high - 0.03 * (high - low), "shown at left", fontsize=4.8, color="#6f6f6f",
+        rate.text((span[0] + span[1]) / 2, high - 0.03 * (high - low), "shown at left", fontsize=4.8, color="#555555",
                   ha="center", va="top")
     rate.plot([centre.min(), centre.max()], [case["constant"]] * 2, color=NEUTRAL, lw=0.8, ls=(0, (1, 1.2)), zorder=1)
     for key, colour in (("hilbert_reference_bpm", INK), ("ossm_kf_track_bpm", OSSM), ("parh_track_bpm", PARH)):
@@ -233,7 +240,6 @@ for row, case in enumerate(cases):
 y_key = HEIGHT - 2.6
 x = 12.0
 x = line_key(x, y_key, "Belt; Hilbert reference rate", INK)
-x = line_key(x, y_key, "Observation", OBS)
 x = line_key(x, y_key, "PARH-OSSM", PARH)
 x = line_key(x, y_key, "OSSM-KF", OSSM)
 x = line_key(x, y_key, "Constant predictor", NEUTRAL, dotted=True)

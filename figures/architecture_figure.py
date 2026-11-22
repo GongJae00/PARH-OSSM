@@ -115,7 +115,7 @@ def image(array, x0, y0, width):
 
 
 def block_arrow(x0, y0, x1, y1):
-    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="simple,head_width=3.4,head_length=2.2,tail_width=1.3",
+    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="simple,head_width=2.6,head_length=1.3,tail_width=0.9",
                                  fc=BLOCK, ec="none", mutation_scale=1.6, zorder=4))
 
 
@@ -175,7 +175,7 @@ ROUTES = [("Optical flow", CHEST, [("of_farneback", "OF", "of_farneback"),
                                                   ("profile1D quadratic", "Quadratic", "profile1d_quadratic"),
                                                   ("profile1D cubic", "Cubic", None),
                                                   ("profile1d_consensus", "Consensus", None)]),
-          ("Vertical shift", TORSO, [("torso_shift", "Torso\ndisplacement", "torso_shift")])]
+          ("Vertical shift", TORSO, [("torso_shift", "Torso", "torso_shift")])]
 TILES = {"of_farneback": (958, 138, 1182, 317), "of_disp_bridge": (1216, 140, 1441, 320),
          "DoF": (1475, 140, 1700, 318), "dof_disp_bridge": (1735, 140, 1960, 318),
          "profile1D linear": (1994, 134, 2219, 312), "profile1D quadratic": (2253, 134, 2478, 312),
@@ -201,12 +201,13 @@ for route, colour, members in ROUTES:
         z = median_z(band_passed(signals[name]))
         trace = axes_at(x, 11.4 + height + 0.6, x + slot, 11.4 + height + 7.2)
         guide(trace)
-        draw_trace(trace, *shown(z), OBS, lw=0.5 if in_bank else 0.35)
+        # the three observations of the filter take their region's colour, as their update shares do in (d)
+        draw_trace(trace, *shown(z), colour if in_bank else OBS, lw=0.55 if in_bank else 0.35)
         if in_bank:
             k = families.index(family)
-            ax.text(middle, 30.6, f"$o_{k + 1}(t)$", fontsize=6.5, ha="center", va="center")
-        if name == "of_disp_bridge":
-            scale = (x, x + slot * 10 / (SPAN_S[1] - SPAN_S[0]))
+            ax.text(middle, 31.0, f"$o_{k + 1}(t)$", fontsize=6.5, ha="center", va="center")
+        if name == "of_farneback":
+            scale = (x, x + slot * 10 / (SPAN_S[1] - SPAN_S[0]), 11.4 + height + 8.2)
         x += slot + inner_gap
     x += route_gap - inner_gap
     route_end = x - route_gap
@@ -214,10 +215,10 @@ for route, colour, members in ROUTES:
     active = any(family is not None for _, _, family in members)
     ax.plot([route_start, route_start, route_end, route_end], [33.3, 34.2, 34.2, 33.3], color=colour, lw=0.6)
     ax.text((route_start + route_end) / 2, 36.4, route, fontsize=5.5, ha="center", va="center", color=INK)
-# time scale of the traces: a 10-s double arrow under the OF bridge trace, which carries no o_k label
-ax.add_patch(FancyArrowPatch((scale[0], 30.6), (scale[1], 30.6), arrowstyle="<|-|>,head_width=0.7,head_length=1.0",
+# time scale of the traces: a 10-s double arrow directly under the left end of the OF trace
+ax.add_patch(FancyArrowPatch((scale[0], scale[2]), (scale[1], scale[2]), arrowstyle="<|-|>,head_width=0.7,head_length=1.0",
                              mutation_scale=1, lw=0.45, color=INK, shrinkA=0, shrinkB=0))
-ax.text(scale[1] + 0.8, 30.6, "10 s", fontsize=5, va="center")
+ax.text(scale[1] + 0.6, scale[2], "10 s", fontsize=5, va="center")
 # what the frame means, in the title row of the panel
 ax.add_patch(Rectangle((right - 33.0, 2.1), 3.2, 2.2, fc="none", ec=INK, lw=1.0))
 ax.text(right - 29.0, 3.2, "used by the filter, $o_1$–$o_3$", fontsize=5.5, va="center")
@@ -298,7 +299,7 @@ for axes in (rate, waveform):
     for side in ("top", "right"):
         axes.spines[side].set_visible(False)
     guide(axes)
-rate.text(TRANSIENT_S + 0.8, high - 0.06 * (high - low), "Transient", fontsize=5, color=NEUTRAL, va="top")
+rate.text(TRANSIENT_S + 0.8, high - 0.06 * (high - low), "Transient", fontsize=5, color="#555555", va="top")
 
 fig.savefig(out_pdf, dpi=600)
 print(f"{trial}: families {families}; transient {TRANSIENT_S:.1f} s; "

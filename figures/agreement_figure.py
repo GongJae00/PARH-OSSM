@@ -55,12 +55,14 @@ def letter(x_mm, y_mm, text, title):
 
 
 TOP, BOTTOM = 8.0, 54.0
+# one square range for both panels, so that the slopes can be compared by eye
+shown_all = pd.concat([t[t.method.isin([m for m, _, _ in SCATTER])] for t in (cohface, mahnob)])
+low = np.floor(shown_all[["estimate_bpm", "reference_bpm"]].min().min()) - 0.5
+high = np.ceil(shown_all[["estimate_bpm", "reference_bpm"]].max().max()) + 0.5
+span = high - low
 for panel, (trials, title, x0) in enumerate([(cohface, f"COHFACE, {cohface.trial.nunique()} trials", 13.0),
                                               (mahnob, f"MAHNOB-HCI test, {mahnob.trial.nunique()} trials", 72.0)]):
     ax = axes_mm(x0, TOP, x0 + (BOTTOM - TOP), BOTTOM)
-    shown = trials[trials.method.isin([m for m, _, _ in SCATTER])]
-    low = np.floor(shown[["estimate_bpm", "reference_bpm"]].min().min()) - 0.5
-    high = np.ceil(shown[["estimate_bpm", "reference_bpm"]].max().max()) + 0.5
     cohort = trials[trials.method == "constant"].estimate_bpm.iloc[0]
     ax.plot([low, high], [low, high], color=GUIDE, lw=0.6, ls=(0, (3, 2)), zorder=1)
     ax.axhline(cohort, color=NEUTRAL, lw=0.7, ls=(0, (1, 1.2)), zorder=1)
@@ -78,15 +80,14 @@ for panel, (trials, title, x0) in enumerate([(cohface, f"COHFACE, {cohface.trial
     ax.tick_params(length=1.5, pad=1, labelsize=5)
     ax.set_xlabel("Reference rate (bpm)", fontsize=5.5, labelpad=1)
     ax.set_ylabel("Estimated rate (bpm)", fontsize=5.5, labelpad=1)
-    # key in the upper left: a stroke of each fit line, its name, and its slope
-    for k, (name, colour, slope) in enumerate(reversed(keys)):
-        y = high - (high - low) * (0.07 + 0.075 * k)
-        x = low + (high - low) * 0.04
-        ax.plot([x, x + (high - low) * 0.06], [y, y], color=colour, lw=1.0)
-        ax.text(x + (high - low) * 0.085, y, f"{name}, slope {slope:.2f}", fontsize=5.2, va="center", color=INK)
-    span = high - low
-    ax.text(high - span * 0.02, cohort + span * 0.012, "cohort rate", fontsize=4.8, color="#6f6f6f", ha="right",
-            va="bottom")
+    # key in the empty lower right (high reference, low estimate): a stroke of each fit line, its name, its slope
+    for k, (name, colour, slope) in enumerate(keys):
+        y = low + span * (0.06 + 0.08 * k)
+        x = low + span * 0.44
+        ax.plot([x, x + span * 0.06], [y, y], color=colour, lw=1.0)
+        ax.text(x + span * 0.085, y, f"{name}, slope {slope:.2f}", fontsize=5.2, va="center", color=INK)
+    ax.text(low + span * 0.02, cohort + span * 0.012, "cohort rate", fontsize=4.8, color="#6f6f6f", ha="left",
+            va="bottom", path_effects=WHITE_EDGE)
     letter(x0 - 11.0, 4.6, "ab"[panel], title)
 
 # c: bias by tercile of the reference rate, as in Supplementary Tables 1-3
