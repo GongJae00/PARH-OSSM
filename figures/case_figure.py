@@ -263,7 +263,7 @@ for row, case in enumerate(cases):
 
 # each column's key at its upper right in the first row, where the marks it names are first read
 y_key = ROW_Y[0] - HEADER + 1.6
-keys_in_line(COLUMNS["observations"][1], y_key, [("Chest ROI", CHEST, "area"), ("Torso box", TORSO, "area")])
+keys_in_line(COLUMNS["share"][1], y_key, [("Chest ROI", CHEST, "area"), ("Torso box", TORSO, "area")])
 keys_in_line(COLUMNS["waveform"][1], y_key, [("Belt", INK, "line"), ("PARH-OSSM", PARH, "line")])
 keys_stacked(COLUMNS["rate"][1], ROW_Y[0] + 1.4, [("Hilbert reference", INK, "line"), ("PARH-OSSM", PARH, "line"),
                                                  ("OSSM-KF", OSSM, "line"), ("Constant predictor", NEUTRAL, "dotted")])
