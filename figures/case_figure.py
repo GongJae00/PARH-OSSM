@@ -142,7 +142,13 @@ def end_labels(items, x_mm=None):
     anchors = [to_mm(ax, x, y) for ax, x, y, _, _ in items]
     ys = spread([a[1] for a in anchors])
     for (ax, x, y, text, colour), (ax_mm, _), label_y in zip(items, anchors, ys):
-        canvas.text(ax_mm + 0.9 if x_mm is None else x_mm, label_y, text, fontsize=5, color=colour, va="center")
+        line_key(ax_mm + 0.9 if x_mm is None else x_mm, label_y, text, colour)
+
+
+def line_key(x_mm, y_mm, text, colour):
+    """A name in ink after a short stroke of its line's colour, so that colour is never the only cue."""
+    canvas.plot([x_mm, x_mm + 1.3], [y_mm, y_mm], color=colour, lw=0.9, solid_capstyle="butt")
+    canvas.text(x_mm + 1.8, y_mm, text, fontsize=5, color=INK, va="center")
 
 
 def row_title(y, text):
@@ -237,8 +243,8 @@ for column, case in enumerate(cases):
     waveform.set_xlabel("Time (s)", fontsize=5.5, labelpad=1)
     if column == 0:
         # a's traces run to the gutter, so its two names sit above the right end of the axis
-        canvas.text(x1, ROW3_Y - 0.5, "PARH-OSSM", fontsize=5, color=PARH, ha="right", va="bottom")
-        canvas.text(x1 - 11.0, ROW3_Y - 0.5, "Belt", fontsize=5, color=INK, ha="right", va="bottom")
+        line_key(x1 - 12.6, ROW3_Y - 1.2, "PARH-OSSM", PARH)
+        line_key(x1 - 19.6, ROW3_Y - 1.2, "Belt", INK)
     else:
         ends = []
         for label_text, time, z, colour in (("Belt", belt_time[shown], z_belt, INK),

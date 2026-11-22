@@ -1,12 +1,13 @@
 """Figure 1: the pipeline of PARH-OSSM from video to outputs, drawn at the text width of the article (175.9 mm) so
 that LaTeX does not scale it.
 
-Top row: (a) the video, (b) the regions placed on its first frame, (c) the three observations of the bank. Bottom
+Top row: (a) the video, (b) the regions placed on its first frame, (c) the nine observations of the extraction,
+grouped by image measurement, with the three of the bank framed. Bottom
 row: (d) the reliability-weighted observation law, (e) the oscillator state-space model and its smoothed state,
 (f) the two outputs. The photographs are raster crops of the nine-observation version of the submitted figure, whose
-photographs show an author, and illustrate the regions only. Each observation is drawn as what it measures: OF as
-vertical flow vectors in the chest ROI, P1D as cross-correlation samples at integer lags with the parabola through
-the three around the peak and its vertex, torso displacement as the torso box and its shifted copy. Every trace is the
+photographs show an author, and illustrate the regions only. Each observation is drawn with its operator image from the submitted
+figure (frame stacks of the flow and difference images, the correlation curve and its fitted interpolant for the P1D
+routes, the torso box on the photograph). Every trace is the
 stored output of one development trial of the frozen run (MAHNOB-HCI session 10) over 5-50 s: the observations
 band-passed to 0.08-0.5 Hz and scaled by their median absolute deviation, the share of each observation in the
 Kalman update, w_k = (1 / R_eff,k) / sum_j (1 / R_eff,j) from R_eff_t_channels, the RTS-smoothed state components
@@ -113,56 +114,6 @@ def image(array, x0, y0, width):
     return height
 
 
-def icon_axes(x0, y0, width, height):
-    """An axes over a figure rectangle in mm whose data units are mm from its top left corner."""
-    icon = fig.add_axes((x0 / WIDTH, 1 - (y0 + height) / HEIGHT, width / WIDTH, height / HEIGHT))
-    icon.set(xlim=(0, width), ylim=(height, 0))
-    icon.axis("off")
-    return icon
-
-
-def flow_icon(x0, y0, width, height):
-    """Dense optical flow in the chest ROI: a grid of vertical flow vectors, whose median is the observation."""
-    icon = icon_axes(x0, y0, width, height)
-    icon.add_patch(Rectangle((0.3, 0.8), width - 0.6, height - 1.6, fc="none", ec=CHEST, lw=0.6))
-    for i, length in enumerate(1.4 + 0.5 * np.sin(np.arange(10) * 1.7)):
-        x = 2.0 + (i % 5) * (width - 4.0) / 4
-        y = 0.8 + (height - 1.6) * (0.3 if i < 5 else 0.7)
-        icon.add_patch(FancyArrowPatch((x, y + length / 2), (x, y - length / 2), mutation_scale=1, lw=0.4,
-                                       arrowstyle="-|>,head_width=0.5,head_length=0.7", color=INK,
-                                       shrinkA=0, shrinkB=0))
-
-
-def correlation_icon(x0, y0, width, height):
-    """Cross-correlation of consecutive profiles at integer lags (grey), the parabola through the three samples around
-    the peak (ink), and its vertex, the refined shift."""
-    lags = np.arange(-3, 4)
-    samples = np.exp(-0.5 * ((lags - 0.42) / 1.1) ** 2)
-    peak = int(np.argmax(samples))
-    parabola = np.polyfit(lags[peak - 1:peak + 2], samples[peak - 1:peak + 2], 2)
-    vertex = -parabola[1] / (2 * parabola[0])
-    fine = np.linspace(vertex - 1.5, vertex + 1.5, 200)
-    icon = fig.add_axes((x0 / WIDTH, 1 - (y0 + height) / HEIGHT, width / WIDTH, height / HEIGHT))
-    icon.axhline(0, color=NEUTRAL, lw=0.4)
-    icon.plot(fine, np.polyval(parabola, fine), color=INK, lw=0.5)
-    icon.plot(lags, samples, "o", ms=1.6, mfc="white", mec=NEUTRAL, mew=0.5, zorder=3)
-    icon.plot([vertex] * 2, [0, np.polyval(parabola, vertex)], color=INK, lw=0.4)
-    icon.set(xlim=(-3.4, 3.4), ylim=(-0.08, 1.2))
-    icon.axis("off")
-
-
-def shift_icon(x0, y0, width, height):
-    """Torso displacement: the torso box of the keyframe (filled) and of the current frame (dashed), shifted upward."""
-    icon = icon_axes(x0, y0, width, height)
-    box_w, box_h, shift = width - 4.0, height - 3.0, 1.6
-    icon.add_patch(Rectangle((0.3, 2.2), box_w, box_h, fc=tint(TORSO), ec="none"))
-    icon.add_patch(Rectangle((0.3, 2.2 - shift), box_w, box_h, fc="none", ec=TORSO, lw=0.6, ls=(0, (2.2, 1.2))))
-    middle = 2.2 + box_h / 2
-    icon.add_patch(FancyArrowPatch((box_w + 2.0, middle), (box_w + 2.0, middle - shift - 0.8), mutation_scale=1,
-                                   lw=0.4, arrowstyle="-|>,head_width=0.6,head_length=0.8", color=INK,
-                                   shrinkA=0, shrinkB=0))
-
-
 def block_arrow(x0, y0, x1, y1):
     ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="simple,head_width=2.8,head_length=1.8,tail_width=1.0",
                                  fc=BLOCK, ec="none", mutation_scale=1.6))
@@ -171,12 +122,6 @@ def block_arrow(x0, y0, x1, y1):
 def arrow(x0, y0, x1, y1):
     ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="-|>,head_width=0.9,head_length=1.6",
                                  mutation_scale=1, lw=0.5, color=INK, shrinkA=0, shrinkB=0))
-
-
-def region_bracket(x0, x1, y, colour, label):
-    """A thin bracket under the observations of one region, in its colour, with the region named below it."""
-    ax.plot([x0, x0, x1, x1], [y - 0.9, y, y, y - 0.9], color=colour, lw=0.6)
-    ax.text((x0 + x1) / 2, y + 2.0, label, fontsize=5.5, ha="center", va="center", color=colour)
 
 
 def bracket(x0, x1, y0, y1):
@@ -215,41 +160,74 @@ for (x, y), label_y, label, colour in [(on_photo(80, TORSO_BOX[3]), photo_bottom
                                        (on_photo(CHEST_BOX[2], shoulder_v + 3), photo_bottom + 9.6,
                                         "Shoulder landmark", INK)]:
     ax.plot([x, x], [y, label_y - 1.1], color=NEUTRAL, lw=0.35, zorder=3)
-    ax.text(x + (0.4 if colour == INK else 0), label_y, label, fontsize=5.5, va="center", color=colour,
+    ax.text(x + (0.4 if colour == INK else 0), label_y, label, fontsize=5.5, va="center", color=INK,
             ha="right" if colour == INK else "center")
 block_arrow(53.7, 20, 57.1, 20)
 
-# c: the three observations, each with what it measures and its trace
+# c: the nine observations of the extraction, grouped by image measurement; the three of the bank are framed in ink
+# and numbered as in panel d, the other six are drawn in grey. Each tile is the operator image of the submitted
+# figure (TILES, pixel boxes in the nine-observation PNG), and each trace is that observation in this trial.
 panel(57.3, 0.3, WIDTH - 0.3, 41.0, "c", "Video-derived observations")
-left, gap = 59.0, 3.4
-slot = (WIDTH - 1.7 - left - 2 * gap) / 3
-ICONS = {"of_farneback": flow_icon, "profile1d_quadratic": correlation_icon, "torso_shift": shift_icon}
-for k, family in enumerate(families):
-    name, label, colour = FAMILIES[family]
-    x = left + k * (slot + gap)
-    middle = x + slot / 2
-    ax.text(middle, 8.4, label, fontsize=5.5, ha="center", va="center")
-    ICONS[family](middle - 6.5, 10.0, 13.0, 9.0)
-    trace = axes_at(x, 20.4, x + slot, 28.8)
-    guide(trace)
-    draw_trace(trace, *shown(scaled[family]), OBS, lw=0.5)
-    ax.text(middle, 31.4, f"$o_{k + 1}(t)$", fontsize=7, ha="center", va="center")
-    if k == 0:
-        guide_x = x + slot * (TRANSIENT_S - SPAN_S[0]) / (SPAN_S[1] - SPAN_S[0])
-        ax.text(guide_x + 0.6, 19.9, "Transient", fontsize=5, color=NEUTRAL, va="center")
-scale_end = left + slot * 10 / (SPAN_S[1] - SPAN_S[0])
-ax.plot([left, scale_end], [31.4, 31.4], color=INK, lw=0.6, solid_capstyle="butt")
-ax.text(scale_end + 0.8, 31.4, "10 s", fontsize=5, va="center")
-chest_end = left + 2 * slot + gap
-region_bracket(left, chest_end, 35.4, CHEST, "Chest ROI")
-region_bracket(chest_end + gap, chest_end + gap + slot, 35.4, TORSO, "Torso box")
+ROUTES = [("Optical flow", CHEST, [("of_farneback", "OF", "of_farneback"),
+                                    ("of_disp_bridge", "OF bridge", None)]),
+          ("Frame difference", CHEST, [("DoF", "DoF", None), ("dof_disp_bridge", "DoF bridge", None)]),
+          ("1-D intensity profile (P1D)", CHEST, [("profile1D linear", "Linear", None),
+                                                  ("profile1D quadratic", "Quadratic", "profile1d_quadratic"),
+                                                  ("profile1D cubic", "Cubic", None),
+                                                  ("profile1d_consensus", "Consensus", None)]),
+          ("Vertical shift", TORSO, [("torso_shift", "Torso\ndisplacement", "torso_shift")])]
+TILES = {"of_farneback": (958, 138, 1182, 317), "of_disp_bridge": (1216, 140, 1441, 320),
+         "DoF": (1475, 140, 1700, 318), "dof_disp_bridge": (1735, 140, 1960, 318),
+         "profile1D linear": (1994, 134, 2219, 312), "profile1D quadratic": (2253, 134, 2478, 312),
+         "profile1D cubic": (2512, 134, 2737, 312), "profile1d_consensus": (2772, 132, 2997, 312),
+         "torso_shift": (3031, 134, 3256, 310)}
+INSET = 7
+left, right, inner_gap, route_gap = 59.2, WIDTH - 2.0, 1.1, 3.0
+n_tiles = sum(len(r[2]) for r in ROUTES)
+slot = (right - left - inner_gap * (n_tiles - len(ROUTES)) - route_gap * (len(ROUTES) - 1)) / n_tiles
+x = left
+for route, colour, members in ROUTES:
+    route_start = x
+    for name, label, family in members:
+        in_bank = family is not None
+        middle = x + slot / 2
+        ax.text(middle, 8.6, label, fontsize=5.5, ha="center", va="center", linespacing=0.95,
+                color=INK if in_bank else NEUTRAL)
+        x0, y0, x1, y1 = TILES[name]
+        tile = figure[y0 + INSET:y1 - INSET, x0 + INSET:x1 - INSET]
+        height = image(tile if in_bank else (255 - 0.45 * (255 - tile.astype(float))).astype(np.uint8),
+                       x, 11.4, slot)
+        ax.add_patch(Rectangle((x, 11.4), slot, height, fc="none", ec=INK if in_bank else FRAME,
+                               lw=0.8 if in_bank else 0.4, zorder=2))
+        z = median_z(band_passed(signals[name]))
+        trace = axes_at(x, 11.4 + height + 0.6, x + slot, 11.4 + height + 7.2)
+        guide(trace)
+        draw_trace(trace, *shown(z), OBS if in_bank else NEUTRAL, lw=0.45)
+        if in_bank:
+            k = families.index(family)
+            ax.text(middle, 30.6, f"$o_{k + 1}(t)$", fontsize=6.5, ha="center", va="center")
+        if name == "of_disp_bridge":
+            scale = (x, x + slot * 10 / (SPAN_S[1] - SPAN_S[0]))
+        x += slot + inner_gap
+    x += route_gap - inner_gap
+    route_end = x - route_gap
+    # the bracket carries the region's colour only when one of its observations is in the bank; names stay in ink
+    active = any(family is not None for _, _, family in members)
+    ax.plot([route_start, route_start, route_end, route_end], [33.3, 34.2, 34.2, 33.3],
+            color=colour if active else NEUTRAL, lw=0.6)
+    ax.text((route_start + route_end) / 2, 36.4, route, fontsize=5.5, ha="center", va="center",
+            color=INK if active else NEUTRAL)
+# time scale of the traces, in the title row so that it is not read as the label of one tile
+scale_end = right - 4.2
+ax.plot([scale_end - (scale[1] - scale[0]), scale_end], [3.2, 3.2], color=INK, lw=0.6, solid_capstyle="butt")
+ax.text(scale_end + 0.6, 3.2, "10 s", fontsize=5, va="center")
 block_arrow(64.0, 41.2, 64.0, 44.6)
 
 # d: observation law; each row of the observation vector, its noise variance, its trust, and its update share
 panel(0.3, 44.8, 72.0, HEIGHT - 0.3, "d", "Reliability-weighted observation law")
 rows_y = [58.0, 63.2, 68.4]
 header_y = 52.4
-for x, text in [(13.0, "Observations"), (33.0, "Noise variances"), (45.6, "Trust"), (60.3, "Update share $w_{k,t}$")]:
+for x, text in [(13.0, "Observations"), (33.0, "Noise variances"), (45.6, "Trust"), (60.3, "Update share $s_{k,t}$")]:
     ax.text(x, header_y, text, fontsize=5.5, ha="center", va="center")
 bracket(8.2, 17.8, 55.2, 71.2)
 bracket(27.6, 38.4, 55.2, 71.2)
@@ -269,7 +247,7 @@ for k, (y, family) in enumerate(zip(rows_y, families)):
         for value in (0, 1):
             strip.text(SPAN_S[0] - 0.8, value, str(value), fontsize=5, ha="right", va="center")
 ax.text(36.2, 77.6, "$R^{\\mathrm{eff}}_{k,t} \\propto R^{\\mathrm{self}}_{k,t}\\,/\\,\\pi_{k,t}$,      "
-        "$w_{k,t} = (1/R^{\\mathrm{eff}}_{k,t})\\,/\\,\\Sigma_j\\,(1/R^{\\mathrm{eff}}_{j,t})$",
+        "$s_{k,t} = (1/R^{\\mathrm{eff}}_{k,t})\\,/\\,\\Sigma_j\\,(1/R^{\\mathrm{eff}}_{j,t})$",
         fontsize=6.5, ha="center", va="center")
 block_arrow(72.2, 63.2, 75.4, 63.2)
 
@@ -320,6 +298,7 @@ for axes in (rate, waveform):
     for side in ("top", "right"):
         axes.spines[side].set_visible(False)
     guide(axes)
+rate.text(TRANSIENT_S + 0.8, high - 0.06 * (high - low), "Transient", fontsize=5, color=NEUTRAL, va="top")
 
 fig.savefig(out_pdf, dpi=600)
 print(f"{trial}: families {families}; transient {TRANSIENT_S:.1f} s; "
