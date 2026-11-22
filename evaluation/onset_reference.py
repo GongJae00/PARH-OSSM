@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 from pyedflib import EdfReader
 
+# The first Status edge of the BDF, which onset_alignment_waveform.py detects, is at 30.0 s in every one of the
+# 488 common sessions (checked on all of them), so the onset is a constant here and the BDF's Status channel is not read.
 STIMULUS_ONSET_SEC = 30.0
 BELT_CHANNEL = 44
 

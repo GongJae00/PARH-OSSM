@@ -42,10 +42,12 @@ def trial_rates(path):
     for row, name in enumerate(bank):
         table[row, :rates[name].size] = rates[name]
 
-    chest_median = np.nanmedian(table[:-1], axis=0)
+    chest_rows = [row for row, name in enumerate(bank) if name in CHEST_OBSERVATIONS]
+    chest_median = np.nanmedian(table[chest_rows], axis=0) if chest_rows else np.full(n, np.nan)
     bank_median = np.nanmedian(table, axis=0)
+    torso = table[bank.index(TORSO)] if TORSO in bank else np.full(n, np.nan)
     trial = os.path.basename(path).removesuffix(".pkl")
-    return [(trial, w, bank_median[w], chest_median[w], table[-1, w]) for w in range(n)]
+    return [(trial, w, bank_median[w], chest_median[w], torso[w]) for w in range(n)]
 
 
 if __name__ == "__main__":

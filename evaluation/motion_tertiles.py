@@ -51,7 +51,11 @@ for trial, w in windows.groupby("trial"):
                 rows.append((trial, r, m, np.abs(estimate[valid] - reference[valid]).mean()))
 mae = pd.DataFrame(rows, columns=["trial", "reference", "method", "MAE"])
 
-motion = motion.loc[sorted(set(mae.trial))]
+missing = sorted(set(mae.trial) - set(motion.index))
+if missing:
+    print(f"{len(missing)} scored trials have no head-motion row and are left out: {', '.join(missing)}", file=sys.stderr)
+    mae = mae[~mae.trial.isin(missing)]
+motion = motion.loc[sorted(set(mae.trial) & set(motion.index))]
 motion["tertile"] = pd.qcut(motion.motion_range, 3, labels=["low", "middle", "high"])
 mae = mae.join(motion, on="trial")
 mae.to_csv(out_csv, index=False, float_format="%.4f")

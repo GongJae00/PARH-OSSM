@@ -25,6 +25,7 @@ import numpy as np
 from scipy.signal import butter, sosfiltfilt
 
 BAND_HZ = (0.05, 2.0)
+KINDS = ("translation", "rotation", "brightness")
 
 
 def unit_process(n_frames, fps, rng):
@@ -59,6 +60,8 @@ def perturbed_frames(capture, kind, level, rng):
 
 
 def write_trial(source_root, out_root, kind, level, trial):
+    if kind not in KINDS:
+        raise ValueError(f"unknown perturbation kind {kind!r}; use one of {', '.join(KINDS)}")
     src = os.path.join(source_root, trial)
     dst = os.path.join(out_root, "COHFACE", trial)
     os.makedirs(dst, exist_ok=True)
@@ -78,6 +81,8 @@ def write_trial(source_root, out_root, kind, level, trial):
 
 if __name__ == "__main__":
     source_root, out_root, kind, level = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
+    if kind not in KINDS:
+        raise ValueError(f"unknown perturbation kind {kind!r}; use one of {', '.join(KINDS)}")
     for trial in sys.argv[5:]:
         write_trial(source_root, out_root, kind, level, trial)
         print(trial, flush=True)

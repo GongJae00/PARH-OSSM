@@ -6,9 +6,10 @@ windows. The constant predictor outputs, for each reference, the median over tri
 reference's trial mean. Paired comparisons use the subject as the unit (median of the trial
 differences per subject, Wilcoxon over subjects), as the paper's subject-level statistics do.
 
-A per-window median-fusion CSV (median_fusion_window_rates.py), when given, adds that method.
+A per-window median-fusion CSV (observation_fusion_window_rates.py), when given as <csv>:<column>, adds that method;
+the column is renamed median_fusion_bpm.
 
-usage: three_reference_summary.py <dataset csv> <MAHNOB root or "-"> [exclude sessions file or "-"] [median fusion csv]
+usage: three_reference_summary.py <dataset csv> <MAHNOB root or "-"> [exclude sessions file or "-"] [median fusion <csv>:<column>]
 """
 import os
 import re
@@ -30,7 +31,8 @@ if sys.argv[2] != "-":
 else:
     subject_of = {t: int(t.split("_")[1]) for t in windows.trial.unique()}
 if len(sys.argv) > 4:
-    fusion = pd.read_csv(sys.argv[4])
+    fusion_csv, fusion_column = sys.argv[4].rsplit(":", 1)
+    fusion = pd.read_csv(fusion_csv)[["trial", "window", fusion_column]].rename(columns={fusion_column: "median_fusion_bpm"})
     windows = windows.merge(fusion, on=["trial", "window"], how="left")
     METHODS.insert(3, "median_fusion")
 if len(sys.argv) > 3 and sys.argv[3] != "-":

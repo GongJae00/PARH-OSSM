@@ -5,7 +5,8 @@
 # test score exists. It writes the rows of Tables 2 and 3 (main_tables.sh; for test also the development and
 # all-trial rows), the confirmatory comparison of the frozen PARH-OSSM with the submitted procedure (run w2), the
 # reliability controls, the component ladder and the route exclusions, each once per belt placement, the waveform agreement under
-# the onset placement with its rows of the waveform table, the correlation of the errors of the observation pairs, the
+# the onset placement with its rows of the waveform table, the correlation of the errors of the observation pairs (on all
+# 488 trials in both modes, since it reads no reference), the
 # frozen run's trial means and head-motion tertiles (onset placement), the slopes of the trial means by stage and of the
 # observation tracks, and the Supplementary tables. The scripts that read the split from <records dir> get a copy of it there.
 # <base data dir> holds the pickles of observations/extract.py (the nine observations of all 488 common trials),
@@ -27,6 +28,8 @@ splits=$([ "$evaluated" = test ] && echo "test development all" || echo developm
 mkdir -p "$out" "$records/rate_agreement"
 cp "$split" "$records/"
 
+# the breathing-band coherence reads no reference, so it is computed on all of $base in both modes
+all_base=$base
 if [ "$evaluated" = development ]; then
   scoring=$records/scoring_development
   mkdir -p "$scoring/data" "$scoring/final"
@@ -39,7 +42,7 @@ fi
 
 python evaluation/onset_alignment_waveform.py "$base" "$final" "$mahnob" "$jobs" > "$records/mahnob_${evaluated}_alignment_waveform.csv"
 python evaluation/waveform_table.py "$records" mahnob "$out/T_waveform_mahnob.tex" "$evaluated" > "$out/mahnob_${evaluated}_waveform_table.txt"
-python evaluation/observation_error_correlation.py "$base" "$records/mahnob_error_correlation.csv" - "$jobs" \
+python evaluation/observation_error_correlation.py "$all_base" "$records/mahnob_error_correlation.csv" - "$jobs" \
   > "$out/mahnob_error_correlation.txt"
 
 for placement in onset tail; do

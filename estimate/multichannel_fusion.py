@@ -4198,6 +4198,13 @@ def main() -> int:
     data_dir = Path(args.data_dir).expanduser().absolute()
     out_run = Path(args.out_run).expanduser().absolute()
     out_data = out_run / "data"
+    stale = sorted(out_data.glob("*.pkl")) if out_data.is_dir() else []
+    if stale:
+        raise SystemExit(
+            f"{out_data} already holds {len(stale)} .pkl files (first: {stale[0].name}); a run must start from an "
+            "empty output folder, or trials that fail now would be scored from an earlier run's pickles. "
+            "Use a new --out-run or delete the old run."
+        )
     out_data.mkdir(parents=True, exist_ok=True)
 
     files = sorted(data_dir.glob("*.pkl"))
@@ -4271,9 +4278,15 @@ def main() -> int:
                 if err:
                     errors.append(f"{name}: {err}")
 
+    metrics_dir = out_run / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    (metrics_dir / "materialization_errors.txt").write_text(
+        "".join(f"{line}\n" for line in sorted(errors)), encoding="utf-8"
+    )
     if errors:
         print("\n".join(errors))
-        print(f"> Materialization completed with {len(errors)} skipped/error trials")
+        print(f"> Materialization completed with {len(errors)} skipped/error trials; "
+              f"listed in {metrics_dir / 'materialization_errors.txt'}")
         if _is_strict_release_cfg(cfg):
             print("> Locked activation contract failed.")
             return 1
