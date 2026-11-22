@@ -73,6 +73,7 @@ tests/          tests that pin the filters, the references, the bank, the contro
 | Table 2 | `evaluation/main_tables.sh`, `evaluation/tables/main_tables.py` |
 | Table 3 | `evaluation/waveform/` |
 | Confirmatory tests | `evaluation/rates/confirmatory_test.py` |
+| Each observation tracked alone (Supplementary Table 9) | `evaluation/rates/single_track_errors.py` |
 | Agreement across trials | `evaluation/across_trials/` |
 | Error under motion | `evaluation/motion/`, `evaluation/motion_perturbation.sh` |
 | Supplementary tables | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
