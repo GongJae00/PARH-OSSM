@@ -8,13 +8,13 @@ another. Setting pi_t to 1 instead would also raise the overall trust and confou
 innovation-calibrated noise, is left as it is. The module is re-executed with the patched line before the
 materializer imports the class, and its worker processes are forked afterwards.
 
-usage (from the repository root): python estimate/equal_filter_trust.py <arguments of estimate/multichannel_fusion.py>
+usage (from the repository root): python estimate/controls/equal_filter_trust.py <arguments of estimate/readout/multichannel_fusion.py>
 """
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-import estimate.parh_ossm as parh_module
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+import estimate.filters.parh_ossm as parh_module
 
 trust_line = "R_eff = np.asarray(R_t, dtype=np.float64) / np.maximum(np.asarray(pi_t, dtype=np.float64), 1e-6)"
 equal_trust_line = "R_eff = np.asarray(R_t, dtype=np.float64) / max(float(np.mean(pi_t)), 1e-6)"
@@ -22,7 +22,7 @@ source = open(parh_module.__file__).read()
 assert source.count(trust_line) == 1
 exec(compile(source.replace(trust_line, equal_trust_line), parh_module.__file__, "exec"), parh_module.__dict__)
 
-import estimate.multichannel_fusion as materializer
+import estimate.readout.multichannel_fusion as materializer
 
 sys.argv = ["multichannel_fusion.py", *sys.argv[1:]]
 sys.exit(materializer.main())

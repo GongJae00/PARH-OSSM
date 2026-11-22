@@ -38,9 +38,9 @@ import pandas as pd
 from matplotlib.ticker import MultipleLocator
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate", "bank"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from evaluation.belt_reference import filter_RW, recorded_belt
+from evaluation.reference.belt_reference import filter_RW, recorded_belt
 from bank import BANK
 from figure_style import CHEST, INK, MM, NEUTRAL, OBS, OSSM, PARH, TORSO, draw_share, draw_trace, lighter, median_z
 

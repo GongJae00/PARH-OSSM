@@ -32,10 +32,10 @@ from multiprocessing import Pool
 import numpy as np
 import pyedflib
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from evaluation.belt_reference import recorded_belt
-from evaluation.bounded_lag_waveform import MAX_LAG_SEC, NULL_REFERENCES, WAVEFORMS, aligned_ccc, zscored_band
-from evaluation.phase_randomized_null import SURROGATES, phase_randomized
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+from evaluation.reference.belt_reference import recorded_belt
+from evaluation.waveform.bounded_lag_waveform import MAX_LAG_SEC, NULL_REFERENCES, WAVEFORMS, aligned_ccc, zscored_band
+from evaluation.waveform.phase_randomized_null import SURROGATES, phase_randomized
 
 BELT_CHANNEL = 44
 PLACEMENTS = ["tail", "onset"]

@@ -1,4 +1,4 @@
-"""Compute the torso displacement observation (torso_shift in observations/chest_motion.py) of every MAHNOB-HCI
+"""Compute the torso displacement observation (torso_shift in observations/image/chest_motion.py) of every MAHNOB-HCI
 session, outside the dataset tree.
 
 The pipeline reads observation caches from the session folder of the video, which for the original dataset is
@@ -16,8 +16,8 @@ from multiprocessing import Pool
 import cv2
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from observations.chest_motion import torso_shift
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+from observations.image.chest_motion import torso_shift
 from observations.run_shards import list_trials
 
 

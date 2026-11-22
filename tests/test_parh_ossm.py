@@ -1,6 +1,6 @@
 import numpy as np
 
-from estimate.parh_ossm import oscillator_PARH_OSSM
+from estimate.filters.parh_ossm import oscillator_PARH_OSSM
 
 FS = 20.0
 RATE_HZ = 0.3

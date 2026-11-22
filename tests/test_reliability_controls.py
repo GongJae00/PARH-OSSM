@@ -19,7 +19,7 @@ def priors_file(tmp_path):
 
 def run_control(tmp_path, control):
     out = tmp_path / f"{control}.csv"
-    subprocess.run([sys.executable, os.path.join(ESTIMATE, "reliability_controls.py"), str(priors_file(tmp_path)), control,
+    subprocess.run([sys.executable, os.path.join(ESTIMATE, "controls", "reliability_controls.py"), str(priors_file(tmp_path)), control,
                     str(out)], check=True)
     return pd.read_csv(out)
 

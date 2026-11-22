@@ -1,7 +1,7 @@
 import numpy as np
 
-from evaluation.rate_tracks import _instantaneous_freq_hz, _windowed_track_bpm
-from evaluation.window_rates_three_references import breath_count_rate, welch_rates
+from evaluation.reference.rate_tracks import _instantaneous_freq_hz, _windowed_track_bpm
+from evaluation.rates.window_rates_three_references import breath_count_rate, welch_rates
 
 FS = 32.0
 BREATHS_PER_MIN = 15.0

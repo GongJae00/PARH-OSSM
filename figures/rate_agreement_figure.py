@@ -6,8 +6,8 @@ restricted to the test participants, so its slope, r, bias and limits are comput
 which outputs the cohort rate in every window, appears as a horizontal line in the agreement panels.
 
 usage: rate_agreement_figure.py <records dir> <reference: hilbert|welch|count> <out.pdf> [MAHNOB-HCI split, default test]
-<records dir> holds rate_agreement/, the trial-means CSVs written by evaluation/rate_agreement.py, and the
-MAHNOB-HCI subject split (evaluation/mahnob_subject_split.csv).
+<records dir> holds rate_agreement/, the trial-means CSVs written by evaluation/across_trials/rate_agreement.py, and the
+MAHNOB-HCI subject split (configs/evaluation/mahnob_subject_split.csv).
 """
 import os
 import sys

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from estimate.ossm_kf import oscillator_KFstd
+from estimate.filters.ossm_kf import oscillator_KFstd
 
 FS = 20.0
 

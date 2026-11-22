@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from tqdm import tqdm
-from observations.trial_io import (
+from observations.trials.trial_io import (
     _filter_valid_rois,
     _sanitize_run_label,
     derive_trial_identifiers,

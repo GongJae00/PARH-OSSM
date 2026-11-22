@@ -1,8 +1,8 @@
 from typing import Optional
 
-from estimate.oscillator_base import OscillatorParams
-from estimate.ossm_kf import oscillator_KFstd
-from estimate.parh_ossm import oscillator_PARH_OSSM
+from estimate.filters.oscillator_base import OscillatorParams
+from estimate.filters.ossm_kf import oscillator_KFstd
+from estimate.filters.parh_ossm import oscillator_PARH_OSSM
 
 HEAD_REGISTRY = {
     "kfstd": oscillator_KFstd,

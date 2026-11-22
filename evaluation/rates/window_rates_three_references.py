@@ -26,9 +26,9 @@ from multiprocessing import Pool
 import numpy as np
 from scipy.signal import argrelextrema
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from evaluation.belt_reference import filter_RW, recorded_belt, sig_windowing, sig_to_RPM
-from evaluation.rate_tracks import _instantaneous_freq_hz, _windowed_track_bpm
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+from evaluation.reference.belt_reference import filter_RW, recorded_belt, sig_windowing, sig_to_RPM
+from evaluation.reference.rate_tracks import _instantaneous_freq_hz, _windowed_track_bpm
 
 WIN, STRIDE, MIN_HZ, MAX_HZ = 30, 1, 0.08, 0.5
 

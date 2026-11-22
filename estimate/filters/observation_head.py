@@ -4,9 +4,9 @@ from typing import Any, Dict, Optional, Tuple, List, Mapping
 
 import numpy as np
 from scipy import signal as sps
-from observations.trial_io import _deep_merge_dict, derive_trial_identifiers
+from observations.trials.trial_io import _deep_merge_dict, derive_trial_identifiers
 
-from observations.observation_signals import (
+from observations.signals.observation_signals import (
     OF_Model,
     OFDisplacementBridge_Model,
     DoF_Model,
@@ -18,7 +18,7 @@ from observations.observation_signals import (
     TorsoShift_Model,
     TORSO_SHIFT_CACHE_FILE,
 )
-from estimate.heads import OscillatorParams, build_head
+from estimate.filters.heads import OscillatorParams, build_head
 
 ROI_STATS_CACHE_SCHEMA = "roi_stats_cache.v1"
 ROI_STATS_CACHE_FILE = "obs_roi_stats_v1.npz"
@@ -360,7 +360,7 @@ def _load_roi_stats_cache(
         return None
 
 
-from observations.observation_signals import MethodBase
+from observations.signals.observation_signals import MethodBase
 
 class OscillatorWrappedMethod(MethodBase):
     """Wraps an existing chest-based method with an oscillator head."""

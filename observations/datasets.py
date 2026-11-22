@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 from pyedflib import EdfReader
 
-from observations.chest_roi import get_chest_ROI, sort_nicely
+from observations.image.chest_roi import get_chest_ROI, sort_nicely
 
 
 class Dataset:

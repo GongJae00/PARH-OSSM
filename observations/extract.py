@@ -17,10 +17,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from collections import Counter
 
-from estimate.observation_head import create_wrapped_method
+from estimate.filters.observation_head import create_wrapped_method
 from observations.config import load_config
 from observations.datasets import COHFACE, MAHNOB
-from observations.observation_signals import (
+from observations.signals.observation_signals import (
     DoF_Model,
     DoFDisplacementBridge_Model,
     OF_Model,
@@ -29,7 +29,7 @@ from observations.observation_signals import (
     TorsoShift_Model,
     profile1D_Model,
 )
-from observations.trial_runner import extract_respiration
+from observations.trials.trial_runner import extract_respiration
 
 # Execution order of the observation families in the stored estimates.
 FAMILY_ORDER = {

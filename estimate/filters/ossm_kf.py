@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 import numpy as np
-from estimate.oscillator_base import _BaseOscillatorHead
+from estimate.filters.oscillator_base import _BaseOscillatorHead
 
 class oscillator_KFstd(_BaseOscillatorHead):
     head_key = "kfstd"

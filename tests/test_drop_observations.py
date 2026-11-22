@@ -25,7 +25,7 @@ def drop(tmp_path, source_methods, variant):
     source.mkdir(exist_ok=True)
     with open(source / "mahnob_1.pkl", "wb") as f:
         pickle.dump({"estimates": source_methods}, f)
-    subprocess.run([sys.executable, os.path.join(ESTIMATE, "drop_observations.py"), str(source), str(copy), variant], check=True)
+    subprocess.run([sys.executable, os.path.join(ESTIMATE, "bank", "drop_observations.py"), str(source), str(copy), variant], check=True)
     with open(copy / "mahnob_1.pkl", "rb") as f:
         return [e["method"] for e in pickle.load(f)["estimates"]]
 

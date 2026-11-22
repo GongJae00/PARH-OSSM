@@ -13,11 +13,11 @@ from typing import Iterable, Sequence
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from estimate.multichannel_fusion import DEFAULT_METHODS as MATERIALIZE_DEFAULT_METHODS
+from estimate.readout.multichannel_fusion import DEFAULT_METHODS as MATERIALIZE_DEFAULT_METHODS
 
 
 DEFAULT_METHODS = [method_label for method_label, _family_name, _group_name in MATERIALIZE_DEFAULT_METHODS]

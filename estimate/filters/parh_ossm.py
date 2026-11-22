@@ -44,8 +44,8 @@ Quality score boundary:
 from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from scipy import signal as sps
-from observations.observation_families import get_observation_family_semantics
-from estimate.oscillator_base import _BaseOscillatorHead
+from observations.signals.observation_families import get_observation_family_semantics
+from estimate.filters.oscillator_base import _BaseOscillatorHead
 
 MODEL_VERSION = "parh_ossm"
 

@@ -24,8 +24,8 @@ from multiprocessing import Pool
 import numpy as np
 from scipy import signal
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from evaluation.belt_reference import filter_RW, recorded_belt
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+from evaluation.reference.belt_reference import filter_RW, recorded_belt
 
 MIN_HZ, MAX_HZ = 0.08, 0.5
 MAX_LAG_SEC = 2.0

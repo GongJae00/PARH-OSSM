@@ -35,8 +35,8 @@ import numpy as np
 import pandas as pd
 from scipy.signal import coherence
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from estimate.multichannel_fusion import _bandpass_z, _overlap, _relative_equation
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+from estimate.readout.multichannel_fusion import _bandpass_z, _overlap, _relative_equation
 
 BREATHING_HZ = (0.08, 0.5)
 ABOVE_BREATHING_HZ = (0.7, 2.0)

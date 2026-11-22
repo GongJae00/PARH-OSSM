@@ -11,8 +11,8 @@
 #                                   evaluation/main_tables.sh <records dir> mahnob "<splits>" > <rows>.tex
 set -e
 records=$1
-run=(python evaluation/main_tables.py)
-split=evaluation/mahnob_subject_split.csv
+run=(python evaluation/tables/main_tables.py)
+split=configs/evaluation/mahnob_subject_split.csv
 
 # table <dataset label> <split csv | none> <evaluated split> <dataset> <placement suffix: "" or _onset> <as-submitted run>
 table() {

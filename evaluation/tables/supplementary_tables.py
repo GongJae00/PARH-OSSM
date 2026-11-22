@@ -17,7 +17,7 @@ measurement routes left out of the bank, one row each.
 
 usage: supplementary_tables.py <records dir> <out dir> <MAHNOB-HCI split: test|development> <route exclusions, comma-separated>
 <records dir> holds the CSVs the evaluation scripts wrote, under the names used below, and the MAHNOB-HCI subject split
-(evaluation/mahnob_subject_split.csv).
+(configs/evaluation/mahnob_subject_split.csv).
 """
 import os
 import sys
@@ -25,8 +25,8 @@ import sys
 import pandas as pd
 from scipy.stats import false_discovery_control
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "estimate"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "reliability"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "estimate", "bank"))
 from bank import ADDED_BACK, ROUTES as ROUTE_ROWS
 from reliability_controls_summary import compare
 

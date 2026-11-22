@@ -19,8 +19,8 @@ from multiprocessing import Pool
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from evaluation.bounded_lag_waveform import load, aligned_ccc, MAX_LAG_SEC
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+from evaluation.waveform.bounded_lag_waveform import load, aligned_ccc, MAX_LAG_SEC
 
 SURROGATES = 10
 

@@ -12,7 +12,7 @@
 # <base data dir> holds the pickles of observations/extract.py (the nine observations of all 488 common trials),
 # <bank data dir> those of the bank (estimate/bank_priors.sh), and <final data dir> those of the frozen run of
 # estimate/materialize.sh. The Supplementary tables also read the outputs of evaluation/cohface_scores.sh and
-# head_motion_trials.csv of evaluation/head_motion.py, all in <records dir>. With split development, the waveform
+# head_motion_trials.csv of evaluation/motion/head_motion.py, all in <records dir>. With split development, the waveform
 # scoring reads only the development trials, which it links into <records dir>/scoring_development.
 #
 # usage (from the repository root):
@@ -20,10 +20,10 @@
 #       <MAHNOB-HCI folder> <jobs> [split: test|development, default test]
 set -e
 records=$1; out=$2; base=$3; bank=$4; final=$5; mahnob=$6; jobs=$7; evaluated=${8:-test}
-split=evaluation/mahnob_subject_split.csv
+split=configs/evaluation/mahnob_subject_split.csv
 controls=(equal_readout shuffled_readout equal_filter)
 rungs=(plain_multichannel readout observation_law observability)
-exclusions=($(python estimate/bank.py routes))
+exclusions=($(python estimate/bank/bank.py routes))
 splits=$([ "$evaluated" = test ] && echo "test development all" || echo development)
 mkdir -p "$out" "$records/rate_agreement"
 cp "$split" "$records/"
@@ -40,44 +40,44 @@ if [ "$evaluated" = development ]; then
   base=$scoring/data; final=$scoring/final
 fi
 
-python evaluation/onset_alignment_waveform.py "$base" "$final" "$mahnob" "$jobs" > "$records/mahnob_${evaluated}_alignment_waveform.csv"
-python evaluation/waveform_table.py "$records" mahnob "$out/T_waveform_mahnob.tex" "$evaluated" > "$out/mahnob_${evaluated}_waveform_table.txt"
-python evaluation/observation_error_correlation.py "$all_base" "$records/mahnob_error_correlation.csv" - "$jobs" \
+python evaluation/waveform/onset_alignment_waveform.py "$base" "$final" "$mahnob" "$jobs" > "$records/mahnob_${evaluated}_alignment_waveform.csv"
+python evaluation/waveform/waveform_table.py "$records" mahnob "$out/T_waveform_mahnob.tex" "$evaluated" > "$out/mahnob_${evaluated}_waveform_table.txt"
+python evaluation/reliability/observation_error_correlation.py "$all_base" "$records/mahnob_error_correlation.csv" - "$jobs" \
   > "$out/mahnob_error_correlation.txt"
 
 for placement in onset tail; do
   suffix=$([ $placement = onset ] && echo _onset || echo "")
   frozen_csv=$records/mahnob_frozen${suffix}_window_rates_three_references.csv
-  python evaluation/confirmatory_test.py "$frozen_csv" "$records/mahnob_w2${suffix}_window_rates_three_references.csv" "$split" "$evaluated" \
+  python evaluation/rates/confirmatory_test.py "$frozen_csv" "$records/mahnob_w2${suffix}_window_rates_three_references.csv" "$split" "$evaluated" \
     > "$out/mahnob_confirmatory_${evaluated}_${placement}.txt"
-  python evaluation/reliability_controls_summary.py "$frozen_csv" "$split" "$evaluated" \
+  python evaluation/reliability/reliability_controls_summary.py "$frozen_csv" "$split" "$evaluated" \
     equal_weight="$records/mahnob_equal_weight_track_rates.csv:equal_weight_track_bpm" \
     $(for c in "${controls[@]}"; do echo "$c=$records/mahnob_${c}${suffix}_window_rates_three_references.csv:parh_track_bpm"; done) \
     > "$out/mahnob_reliability_controls_${evaluated}_${placement}.txt"
-  python evaluation/reliability_controls_summary.py "$frozen_csv" "$split" "$evaluated" \
+  python evaluation/reliability/reliability_controls_summary.py "$frozen_csv" "$split" "$evaluated" \
     ossm_kf="$frozen_csv:ossm_kf_track_bpm" median_fusion="$records/mahnob_observation_fusion_window_rates.csv:median_fusion_bank_bpm" \
     $(for r in "${rungs[@]}"; do echo "$r=$records/mahnob_${r}${suffix}_window_rates_three_references.csv:parh_track_bpm"; done) \
     > "$out/mahnob_component_ladder_${evaluated}_${placement}.txt"
-  python evaluation/reliability_controls_summary.py "$frozen_csv" "$split" "$evaluated" \
+  python evaluation/reliability/reliability_controls_summary.py "$frozen_csv" "$split" "$evaluated" \
     $(for e in "${exclusions[@]}"; do echo "$e=$records/mahnob_${e}${suffix}_window_rates_three_references.csv:parh_track_bpm"; done) \
     > "$out/mahnob_route_exclusion_${evaluated}_${placement}.txt"
 done
 
 evaluation/main_tables.sh "$records" mahnob "$splits" > "$records/mahnob_${evaluated}_main_tables.tex"
 
-python evaluation/rate_agreement.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
+python evaluation/across_trials/rate_agreement.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
   "$records/mahnob_observation_fusion_window_rates.csv:median_fusion_bank_bpm" "$records/rate_agreement/mahnob_frozen_onset_trial_means.csv" \
   "$split" "$evaluated" > "$out/mahnob_frozen_onset_rate_agreement_${evaluated}.txt"
-python evaluation/motion_tertiles.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
+python evaluation/motion/motion_tertiles.py MAHNOB-HCI "$records/mahnob_frozen_onset_window_rates_three_references.csv" \
   "$records/head_motion_trials.csv" "$records/rate_agreement/mahnob_frozen_onset_head_motion_trials.csv" "$split" "$evaluated" \
   > "$out/mahnob_frozen_onset_head_motion_tertiles_${evaluated}.txt"
 for reference in hilbert welch count; do
-  python evaluation/stage_slopes.py "$records" $reference mahnob "$evaluated"
+  python evaluation/across_trials/stage_slopes.py "$records" $reference mahnob "$evaluated"
 done > "$out/mahnob_stage_slopes_${evaluated}.txt"
-python evaluation/observation_track_slope.py "$records" "$bank" "$final" "$evaluated" "$jobs" \
+python evaluation/across_trials/observation_track_slope.py "$records" "$bank" "$final" "$evaluated" "$jobs" \
   > "$out/mahnob_observation_track_slope_${evaluated}.txt"
 
-python evaluation/supplementary_tables.py "$records" "$out" "$evaluated" "$(IFS=,; echo "${exclusions[*]}")"
+python evaluation/tables/supplementary_tables.py "$records" "$out" "$evaluated" "$(IFS=,; echo "${exclusions[*]}")"
 for reference in hilbert welch count; do
   python figures/rate_agreement_figure.py "$records" $reference "$out/S_rate_agreement_$reference.pdf" "$evaluated"
 done

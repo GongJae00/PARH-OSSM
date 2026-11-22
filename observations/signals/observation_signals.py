@@ -4,7 +4,7 @@ import os
 import numpy as np
 import cv2 as cv
 from scipy import signal as sps
-from observations.chest_motion import OF, DoF, profile1D, torso_shift
+from observations.image.chest_motion import OF, DoF, profile1D, torso_shift
 
 
 DOF_BRIDGE_CACHE_FILE = "obs_dof_bridge_v2.npy"

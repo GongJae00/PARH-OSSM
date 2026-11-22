@@ -12,10 +12,10 @@ usage: parameter_table.py > supplementary_parameter_table.tex
 import os
 import sys
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, REPO)
-from estimate.parh_ossm import oscillator_PARH_OSSM
-import estimate.multichannel_fusion as materializer
+from estimate.filters.parh_ossm import oscillator_PARH_OSSM
+import estimate.readout.multichannel_fusion as materializer
 
 head = oscillator_PARH_OSSM()
 
@@ -69,7 +69,7 @@ ROWS = [
 SOURCES = {"head": head, "params": head.params, "materializer": materializer}
 
 # Readout groups of the three observations of the bank, under their names in the paper
-# (estimate/reliability_priors.py maps each observation to its group); the code also
+# (estimate/readout/reliability_priors.py maps each observation to its group); the code also
 # defines priors for the groups of the observations the bank leaves out, which no reported run reads.
 GROUP_NAMES = {"G_OF": "OF", "G_P1D_morph": "P1D", "G_Torso": "torso"}
 
