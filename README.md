@@ -77,7 +77,7 @@ tests/          tests that pin the filters, the references, the bank, the contro
 | Each observation tracked alone (Results, large errors) | `evaluation/rates/single_track_errors.py` |
 | Agreement across trials | `evaluation/across_trials/` |
 | Error under motion | `evaluation/motion/`, `evaluation/motion_perturbation.sh` |
-| Tables of the analyses that the article reports in its text, and the parameter list | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
+| Tables of the analyses that the article reports in its text (the script keeps its earlier name), and the parameter list | `evaluation/tables/supplementary_tables.py`, `parameter_table.py` |
 | Figures | `figures/architecture_figure.py`, `case_figure.py`, `agreement_figure.py`, `rate_agreement_figure.py` |
 
 A run is a folder of per-trial pickles. `frozen` is this repository's name for the reported run. The first four

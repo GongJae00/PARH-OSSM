@@ -1,4 +1,4 @@
-"""Rate error of each observation tracked alone (Supplementary Table 9).
+"""Rate error of each observation tracked alone, which the article reports in its Results.
 
 Each observation's OSSM-KF rate track (the `__kfstd` estimate in the per-trial pickles of the bank, the input of
 the PARH readout) is windowed as equal_weight_track_rates.py windows a track, 30-s windows with a 1-s stride from

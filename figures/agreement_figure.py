@@ -3,7 +3,7 @@
 a, b: trial-mean estimate against trial-mean reference, PARH-OSSM and OSSM-KF, with each method's least-squares
 line, the identity line, and the cohort rate that the constant predictor outputs; COHFACE (all 160 trials) and the
 MAHNOB-HCI test participants (310 trials). c: mean signed error (bias) of each method in the terciles of the
-reference rate on the MAHNOB-HCI test participants, computed as Supplementary Tables 1-3 compute it: the tercile
+reference rate on the MAHNOB-HCI test participants, computed as supplementary_tables.py computes it: the tercile
 of a trial comes from its PARH-OSSM trial-mean reference, so every method is summarized on the same trials.
 The values come from rate_agreement.py's trial-means CSVs.
 
@@ -89,7 +89,7 @@ for panel, (trials, title, x0) in enumerate([(cohface, "COHFACE", 13.0), (mahnob
             va="bottom", path_effects=WHITE_EDGE)
     letter(x0 - 11.0, 4.6, "ab"[panel], title)
 
-# c: bias by tercile of the reference rate, as in Supplementary Tables 1-3
+# c: bias by tercile of the reference rate, as supplementary_tables.py computes it
 parh = mahnob[mahnob.method == "parh_track"].set_index("trial").reference_bpm
 edges = parh.quantile([0, 1 / 3, 2 / 3, 1]).to_numpy()
 mahnob["tercile"] = mahnob.trial.map(pd.cut(parh, edges, labels=TERCILES, include_lowest=True))

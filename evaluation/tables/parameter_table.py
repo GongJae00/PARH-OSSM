@@ -1,4 +1,4 @@
-"""Rows of the Supplementary parameter table, read from the code that produced the reported runs.
+"""Rows of the parameter table, read from the code that produced the reported runs.
 
 Each value is read from a fresh PARH-OSSM head (the materializer builds the head without parameters and
 the runs set no RESPYRE_PARH_* override; the pickle meta of the frozen runs carries the same values) or
