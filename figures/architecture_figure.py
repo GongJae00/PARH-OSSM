@@ -15,6 +15,8 @@ on the scale of the fundamental, the rate track at the window centres, and the s
 marks the transient, the time of the largest median over the observations of |z|.
 
 usage: architecture_figure.py <nine-observation figure png> <observation pkl> <final pkl> <window rates csv> <out.pdf>
+The article's Figure 1 shows MAHNOB-HCI session 10 from the reported run: <final pkl> is mahnob_10.pkl in the
+onset-aligned final data of bank_b3 and <window rates csv> the onset-aligned MAHNOB-HCI window rates of the same run.
 """
 import json
 import pickle
