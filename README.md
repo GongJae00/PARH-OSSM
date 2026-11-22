@@ -1,7 +1,7 @@
 <h1 align="center">Video-Based Respiratory Rate Estimation via<br>Multichannel Oscillator State-Space Fusion</h1>
 
 <p align="center">
-Young-Jae Cho<sup>1,†</sup>, Do-Yup Kim<sup>2,†</sup>, Dae-Yeol Kim<sup>1,&#42;</sup>, Youngjun Kim<sup>3,&#42;</sup><br>
+YoungJae Cho<sup>1,†</sup>, Do-Yup Kim<sup>2,†</sup>, Dae-Yeol Kim<sup>1,&#42;</sup>, Youngjun Kim<sup>3,&#42;</sup><br>
 <sup>1</sup>University of Ulsan &nbsp; <sup>2</sup>Incheon National University &nbsp; <sup>3</sup>Changwon National University<br>
 <sup>†</sup>Equal contribution &nbsp; <sup>&#42;</sup>Corresponding authors<br>
 <i>Scientific Reports</i>, in revision

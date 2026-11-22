@@ -4,7 +4,7 @@ title: "PARH-OSSM: video-based respiratory rate estimation via multichannel osci
 type: software
 authors:
   - family-names: Cho
-    given-names: Young-Jae
+    given-names: YoungJae
     affiliation: "University of Ulsan"
   - family-names: Kim
     given-names: Do-Yup
@@ -36,7 +36,7 @@ preferred-citation:
   title: "Video-Based Respiratory Rate Estimation via Multichannel Oscillator State-Space Fusion"
   authors:
     - family-names: Cho
-      given-names: Young-Jae
+      given-names: YoungJae
     - family-names: Kim
       given-names: Do-Yup
     - family-names: Kim
